@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+set -eu
+
+# Always restore the reverse proxy after the standalone renewal attempt.
+systemctl start nginx

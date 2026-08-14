@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -eu
+
+# The certificate uses Certbot's standalone HTTP challenge. Free port 80
+# before each automated renewal attempt.
+systemctl stop nginx
