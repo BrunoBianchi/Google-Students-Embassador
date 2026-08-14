@@ -12,7 +12,7 @@ export const profileSchema = z.object({
   linkedinUrl: optionalUrl.optional(),
   instagramUrl: optionalUrl.optional(),
   phone: z.string().trim().regex(/^[+0-9 ()-]{8,24}$/).optional().or(z.literal("")).transform((value) => value || undefined),
-  avatarFrame: z.enum(["none", "google", "gold", "rainbow", "campus", "gemini", "orbit", "pixel", "network", "constellation", "chrome", "android", "cloud", "firebase", "maps", "codejam", "community", "prism", "devfest", "studio", "spark", "material"]),
+  avatarFrame: z.enum(["none", "google", "gold", "rainbow", "campus", "gemini", "orbit", "pixel", "network", "constellation", "chrome", "android", "cloud", "firebase", "maps", "codejam", "community", "prism", "devfest", "studio", "spark", "material", "heart", "applause", "comet", "aura", "mosaic"]),
 });
 
 export type ProfileInput = z.infer<typeof profileSchema>;
