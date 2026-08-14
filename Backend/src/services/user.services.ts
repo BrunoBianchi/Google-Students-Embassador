@@ -19,6 +19,7 @@ const includesUser = (ids: ObjectId[], userId: ObjectId) => ids.some((id) => id.
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
 const preferences = (user: User): EmailPreferences => ({ eventUpdates: user.emailPreferences?.eventUpdates !== false, forumUpdates: user.emailPreferences?.forumUpdates !== false, productUpdates: user.emailPreferences?.productUpdates !== false });
+const isVerifiedUser = (user: Pick<User, "emailVerifiedAt">) => Boolean(user.emailVerifiedAt);
 
 const hasSameKeys = (existing: { key?: Record<string, number> }, keys: Record<string, number>) => {
   const current = existing.key ?? {};
@@ -168,13 +169,14 @@ export const listAmbassadors = async (viewerId?: ObjectId | null) => {
     where: { userType: "ambassador" },
     order: { createdAt: "DESC" },
   });
-  const universityIds = ambassadors.map((ambassador) => ambassador.universityId).filter(Boolean);
+  const verifiedAmbassadors = ambassadors.filter(isVerifiedUser);
+  const universityIds = verifiedAmbassadors.map((ambassador) => ambassador.universityId).filter(Boolean);
   const universities = universityIds.length
     ? await universityRepository().findByIds(universityIds)
     : [];
   const universityNames = new Map(universities.map((university) => [university._id.toHexString(), university.name]));
 
-  return ambassadors.map((ambassador) => {
+  return verifiedAmbassadors.map((ambassador) => {
     const likedByIds = ambassador.likedByIds ?? [];
     return {
       id: ambassador._id.toHexString(),
@@ -195,7 +197,7 @@ export const listAmbassadors = async (viewerId?: ObjectId | null) => {
 export const toggleProfileLike = async (profileId: string, viewerId: ObjectId) => {
   if (!ObjectId.isValid(profileId)) throw new Error("Resource not found");
   const profile = await userRepository().findOneBy({ _id: new ObjectId(profileId) });
-  if (!profile) throw new Error("Resource not found");
+  if (!profile || !isVerifiedUser(profile)) throw new Error("Resource not found");
   if (profile._id.equals(viewerId)) throw new Error("Cannot like own profile");
 
   const likedByIds = profile.likedByIds ?? [];

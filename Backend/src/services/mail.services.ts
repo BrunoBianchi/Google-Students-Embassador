@@ -27,8 +27,12 @@ export const sendMail = async ({ to, subject, html, text }: { to: string; subjec
   }
   const body = new URLSearchParams({ from: mailgunFrom, to, subject, html, text });
   const authorization = `Basic ${Buffer.from(`api:${mailgunApiKey}`).toString("base64")}`;
-  const response = await fetch(`${mailgunApiBaseUrl}/v3/${mailgunDomain}/messages`, { method: "POST", headers: { Authorization: authorization, "Content-Type": "application/x-www-form-urlencoded" }, body });
-  if (!response.ok) throw new Error(`Mailgun não aceitou o e-mail (${response.status}).`);
+  try {
+    const response = await fetch(`${mailgunApiBaseUrl}/v3/${mailgunDomain}/messages`, { method: "POST", headers: { Authorization: authorization, "Content-Type": "application/x-www-form-urlencoded" }, body });
+    if (!response.ok) throw new Error(`Mailgun request rejected (${response.status}).`);
+  } catch (error) {
+    throw new Error(error instanceof Error && error.message.startsWith("Mailgun") ? error.message : "Mailgun could not send the email.");
+  }
 };
 
 export const preferenceUrl = (user: Pick<User, "emailPreferenceToken">, category: keyof EmailPreferences) => actionUrl(`/unsubscribe?token=${encodeURIComponent(user.emailPreferenceToken ?? "")}&category=${category}`);

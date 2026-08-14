@@ -21,6 +21,7 @@ const messageRepository = () => AppDataSource.getMongoRepository(ForumMessage);
 const includesUser = (ids: ObjectId[], userId: ObjectId) => ids.some((id) => id.equals(userId));
 const isOwner = (createdBy: ObjectId, userId: ObjectId) => createdBy.equals(userId);
 const uniqueIds = (ids: ObjectId[]) => [...new Map(ids.map((id) => [id.toHexString(), id])).values()];
+const isVerifiedUser = (user: Pick<User, "emailVerifiedAt">) => Boolean(user.emailVerifiedAt);
 const resourceId = (id: string) => {
   if (!ObjectId.isValid(id)) throw new Error("Resource not found");
   return new ObjectId(id);
@@ -99,7 +100,7 @@ export const createEvent = async (input: EventInput, userId: ObjectId) => {
   const { organizerIds: requestedOrganizerIds, groupId, createForum, ...eventInput } = input;
   const requestedIds = requestedOrganizerIds.map((id) => new ObjectId(id));
   const requestedUsers = requestedIds.length ? await AppDataSource.getMongoRepository(User).findByIds(requestedIds) : [];
-  if (requestedUsers.length !== requestedIds.length) throw new Error("Event organizer not found");
+  if (requestedUsers.length !== requestedIds.length || requestedUsers.some((user) => !isVerifiedUser(user))) throw new Error("Event organizer not found");
   let groupMembers: ObjectId[] = [];
   if (groupId) {
     const group = await groupRepository().findOneBy({ _id: resourceId(groupId) });
@@ -133,7 +134,7 @@ export const deleteEvent = async (eventId: string, userId: ObjectId) => {
 export const addEventOrganizer = async (eventId: string, organizerId: string, userId: ObjectId) => {
   const event = await requireEventManager(eventId, userId);
   const candidate = ObjectId.isValid(organizerId) ? await AppDataSource.getMongoRepository(User).findOneBy({ _id: new ObjectId(organizerId) }) : null;
-  if (!candidate) throw new Error("Event organizer not found");
+  if (!candidate || !isVerifiedUser(candidate)) throw new Error("Event organizer not found");
   event.organizerIds = uniqueIds([...(event.organizerIds ?? [event.createdBy]), candidate._id]);
   const saved = await eventRepository().save(event);
   await syncEventForumMembers(saved);
@@ -214,7 +215,7 @@ export const inviteGroupMember = async (groupId: string, targetUserId: string, u
   if (!group) throw new Error("Resource not found");
   if (!group.createdBy.equals(userId)) throw new Error("Resource management denied");
   const target = ObjectId.isValid(targetUserId) ? await AppDataSource.getMongoRepository(User).findOneBy({ _id: new ObjectId(targetUserId) }) : null;
-  if (!target || target.userType !== "ambassador") throw new Error("Group invitee not found");
+  if (!target || !isVerifiedUser(target) || target.userType !== "ambassador") throw new Error("Group invitee not found");
   if (!includesUser(group.memberIds ?? [], target._id) && !includesUser(group.pendingMemberIds ?? [], target._id)) group.pendingMemberIds = [...(group.pendingMemberIds ?? []), target._id];
   return groupView(await groupRepository().save(group), userId);
 };
@@ -240,7 +241,7 @@ export const listPendingGroupMembers = async (groupId: string, userId: ObjectId)
   const members = (group.pendingMemberIds ?? []).length
     ? await AppDataSource.getMongoRepository(User).findByIds(group.pendingMemberIds)
     : [];
-  return members.map((member) => ({ id: member._id.toHexString(), name: member.name, nickname: member.nickname, avatarPath: member.avatarPath, avatarFrame: member.avatarFrame ?? "none" }));
+  return members.filter(isVerifiedUser).map((member) => ({ id: member._id.toHexString(), name: member.name, nickname: member.nickname, avatarPath: member.avatarPath, avatarFrame: member.avatarFrame ?? "none" }));
 };
 
 const updateParticipation = async <T extends { _id: ObjectId; createdBy: ObjectId }>(
@@ -294,7 +295,7 @@ export const getEventDetails = async (id: string, viewerId?: ObjectId | null) =>
     ? await AppDataSource.getMongoRepository(University).findByIds(universityIds)
     : [];
   const universityNames = new Map(universities.map((university) => [university._id.toHexString(), university.name]));
-  const userViews = users.map((user) => publicEventParticipant(user, universityNames.get(user.universityId.toHexString()) ?? "Universidade não encontrada"));
+  const userViews = users.filter(isVerifiedUser).map((user) => publicEventParticipant(user, universityNames.get(user.universityId.toHexString()) ?? "Universidade não encontrada"));
   const participantsById = new Map(userViews.map((participant) => [participant.id, participant]));
   const participants = participantIds.flatMap((participantId) => {
     const participant = participantsById.get(participantId.toHexString());
@@ -327,7 +328,7 @@ export const listEventDirectory = async (viewerId?: ObjectId | null) => {
     ? await AppDataSource.getMongoRepository(University).findByIds(universityIds)
     : [];
   const universityNames = new Map(universities.map((university) => [university._id.toHexString(), university.name]));
-  const organizerViews = new Map(organizers.map((organizer) => [organizer._id.toHexString(), publicEventParticipant(organizer, universityNames.get(organizer.universityId.toHexString()) ?? "Universidade não encontrada")]));
+  const organizerViews = new Map(organizers.filter(isVerifiedUser).map((organizer) => [organizer._id.toHexString(), publicEventParticipant(organizer, universityNames.get(organizer.universityId.toHexString()) ?? "Universidade não encontrada")]));
   return events.map((event) => ({
     ...eventView(event, viewerId),
     organizer: organizerViews.get(event.createdBy.toHexString()),
@@ -345,7 +346,7 @@ export const listForumDirectory = async (viewerId?: ObjectId | null) => {
     ? await AppDataSource.getMongoRepository(University).findByIds(universityIds)
     : [];
   const universityNames = new Map(universities.map((university) => [university._id.toHexString(), university.name]));
-  const organizerViews = new Map(organizers.map((organizer) => [organizer._id.toHexString(), publicEventParticipant(organizer, universityNames.get(organizer.universityId.toHexString()) ?? "Universidade não encontrada")]));
+  const organizerViews = new Map(organizers.filter(isVerifiedUser).map((organizer) => [organizer._id.toHexString(), publicEventParticipant(organizer, universityNames.get(organizer.universityId.toHexString()) ?? "Universidade não encontrada")]));
   return forums.filter((forum) => !forum.isPrivate || Boolean(viewerId && includesUser(forum.memberIds ?? [], viewerId))).map((forum) => ({
     id: forum._id.toHexString(),
     title: forum.title,
@@ -413,7 +414,7 @@ export const getDashboard = async (user: User) => {
 export const getPublicProfile = async (id: string, viewerId?: ObjectId | null) => {
   if (!ObjectId.isValid(id)) return null;
   const user = await AppDataSource.getMongoRepository(User).findOneBy({ _id: new ObjectId(id) });
-  if (!user) return null;
+  if (!user || !isVerifiedUser(user)) return null;
   const [university, events, forums, groups, badges] = await Promise.all([
     AppDataSource.getMongoRepository(University).findOneBy({ _id: user.universityId }),
     eventRepository().find(), forumRepository().find(), groupRepository().find(), getUserBadges(user),

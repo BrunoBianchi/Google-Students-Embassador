@@ -17,6 +17,7 @@ const isProduction = process.env.NODE_ENV === "production";
 const canonicalFrontendOrigin = "https://google.studentembassador.com";
 const localFrontendOrigin = /^http:\/\/(?:[a-z0-9-]+\.)?localhost:3000$/i;
 const localApiHost = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i;
+const avatarPlaceholderPath = join(import.meta.dir, "src", "assets", "avatar-placeholder.svg");
 const allowedOrigins = new Set(
   (process.env.FRONTEND_ORIGIN ?? (isProduction ? canonicalFrontendOrigin : "http://localhost:3000"))
     .split(",")
@@ -68,7 +69,8 @@ app.use((request, response, next) => {
   return next();
 });
 app.use(express.json({ limit: "16kb" }));
-app.use("/uploads", express.static(join(import.meta.dir, "uploads"), { fallthrough: false, maxAge: isProduction ? "7d" : 0 }));
+app.use("/uploads", express.static(join(import.meta.dir, "uploads"), { fallthrough: true, maxAge: isProduction ? "7d" : 0 }));
+app.use("/uploads", (_request, response) => response.type("image/svg+xml").sendFile(avatarPlaceholderPath));
 
 app.use("/api/:year/:company/", apiRateLimit, validateCurrentApiURL, apiController);
 

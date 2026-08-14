@@ -88,7 +88,17 @@ userController.post("/register", authRateLimit, upload.single("avatar"), async (
     const avatarPath = request.file ? `/uploads/avatars/${request.file.filename}` : undefined;
     const user = await createUser(userSchema.parse({ ...request.body, avatarPath }));
     const token = await issueEmailVerification(user);
-    await sendVerificationEmail(user, token);
+    try {
+      await sendVerificationEmail(user, token);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Mailgun")) {
+        return response.status(202).json({
+          email: user.email,
+          message: "Sua conta está pendente de confirmação. O envio do e-mail está indisponível agora; use ‘Reenviar confirmação’ em alguns instantes.",
+        });
+      }
+      throw error;
+    }
     return response.status(201).json({
       email: user.email,
       message: "Enviamos um link de confirma\u00e7\u00e3o para o seu e-mail. Confirme sua conta para entrar no Hub.",
