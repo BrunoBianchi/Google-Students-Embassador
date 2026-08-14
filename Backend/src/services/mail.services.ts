@@ -3,6 +3,9 @@ import type { EmailPreferences, User } from "../database/models/user.model";
 const appUrl = (process.env.PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 const mailgunDomain = process.env.MAILGUN_DOMAIN;
 const mailgunApiKey = process.env.MAILGUN_API_KEY;
+// Mailgun uses a different API hostname for EU accounts. Keeping this
+// configurable avoids a misleading 503 when the credentials themselves are valid.
+const mailgunApiBaseUrl = (process.env.MAILGUN_API_BASE_URL ?? "https://api.mailgun.net").replace(/\/$/, "");
 // This address must be an authorized sender in the configured Mailgun domain.
 const mailgunFrom = "Google Student Ambassador Hub <no-reply@studentembassador.com>";
 
@@ -24,7 +27,7 @@ export const sendMail = async ({ to, subject, html, text }: { to: string; subjec
   }
   const body = new URLSearchParams({ from: mailgunFrom, to, subject, html, text });
   const authorization = `Basic ${Buffer.from(`api:${mailgunApiKey}`).toString("base64")}`;
-  const response = await fetch(`https://api.mailgun.net/v3/${mailgunDomain}/messages`, { method: "POST", headers: { Authorization: authorization, "Content-Type": "application/x-www-form-urlencoded" }, body });
+  const response = await fetch(`${mailgunApiBaseUrl}/v3/${mailgunDomain}/messages`, { method: "POST", headers: { Authorization: authorization, "Content-Type": "application/x-www-form-urlencoded" }, body });
   if (!response.ok) throw new Error(`Mailgun não aceitou o e-mail (${response.status}).`);
 };
 
