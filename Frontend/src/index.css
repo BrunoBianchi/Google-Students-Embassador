@@ -1,50 +1,276 @@
 @import "tailwindcss";
 
 @layer base {
-  :root {
-    @apply text-[rgba(255,255,255,0.87)] bg-[#242424] font-sans;
+  html {
+    min-width: 320px;
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply grid place-items-center min-w-[320px] min-h-screen relative m-0;
+    @apply antialiased m-0;
+    font-family: 'Google Sans', system-ui, -apple-system, sans-serif;
+    background-color: #FAFAFE;
+    color: #1e293b;
+    overflow-x: hidden;
+
+    /* Google Subtle Repeating Diagonal Micro-Pattern */
+    background-image:
+      repeating-linear-gradient(45deg, rgba(66, 133, 244, 0.03) 0, rgba(66, 133, 244, 0.03) 1px, transparent 1px, transparent 24px),
+      repeating-linear-gradient(-45deg, rgba(66, 133, 244, 0.03) 0, rgba(66, 133, 244, 0.03) 1px, transparent 1px, transparent 24px);
+    background-position: 0 0, 0 0;
+    background-size: 48px 48px;
+  }
+
+  img, svg, video, canvas {
+    max-width: 100%;
+  }
+
+  ::selection {
+    background: #FBBC04;
+    color: #1e293b;
   }
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  opacity: 0.05;
-  background: url("./logo.svg");
-  background-size: 256px;
-  transform: rotate(-12deg) scale(1.35);
-  animation: slide 30s linear infinite;
-  pointer-events: none;
+@layer utilities {
+  .input-auth {
+    width: 100%;
+    box-sizing: border-box;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    outline: none;
+  }
+  .input-auth:focus { border-color: #4285F4; }
+  /* These are deliberately custom classes instead of Tailwind padding utilities:
+     .input-auth is emitted after those utilities and would otherwise reset them. */
+  .input-auth-leading-icon { padding-left: 3rem; }
+  .input-auth-leading-and-trailing-icon { padding-left: 3rem; padding-right: 3.25rem; }
+  .input-icon {
+    pointer-events: none;
+    z-index: 1;
+  }
+  .button-primary, .button-secondary {
+    min-height: 3rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 2px solid #1e293b;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 900;
+    touch-action: manipulation;
+  }
+  .button-primary { background: #4285F4; color: white; box-shadow: 4px 4px 0 #1e293b; }
+  .button-secondary { background: white; color: #1e293b; }
+  .button-primary:disabled { cursor: wait; opacity: 0.7; }
+  .card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    align-self: flex-start;
+  }
+  .card-action {
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border: 2px solid #1e293b;
+    border-radius: 0.7rem;
+    padding: 0.625rem 0.85rem;
+    font-size: 0.75rem;
+    font-weight: 900;
+    line-height: 1;
+    transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  }
+  .card-action:hover { transform: translateY(-1px); box-shadow: 3px 3px 0 #1e293b; }
+  .card-action:focus-visible { outline: 3px solid #4285F4; outline-offset: 2px; }
+  .card-action-neutral { background: #fff; color: #1e293b; }
+  .card-action-neutral:hover { background: #F8FAFE; }
+  .card-action-primary { background: #4285F4; color: #fff; }
+  .card-action-primary:hover { background: #1A73E8; }
+  .card-action-danger { background: #FDECEA; border-color: #EA4335; color: #A61B16; }
+  .card-action-danger:hover { background: #EA4335; color: #fff; box-shadow: 3px 3px 0 #A61B16; }
+  .avatar-frame {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1.1rem;
+    padding: 3px;
+    background: #fff;
+  }
+  .avatar-inner {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 0.9rem;
+    background: #4285F4;
+    color: #fff;
+    border: 2px solid #fff;
+  }
+  .avatar-inner img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar-frame-google { background: conic-gradient(from 35deg, #4285F4 0 25%, #EA4335 0 50%, #FBBC04 0 75%, #34A853 0); }
+  .avatar-frame-gold { background: linear-gradient(135deg, #8A5B00, #FBBC04 42%, #FFF3B6 58%, #B77900); background-size: 220% 220%; animation: frameGoldGlow 3.5s ease-in-out infinite; }
+  .avatar-frame-rainbow { background: linear-gradient(135deg, #4285F4, #EA4335, #FBBC04, #34A853, #4285F4); background-size: 300% 300%; animation: frameRainbowFlow 5s linear infinite; }
+  .avatar-frame-campus { background: repeating-linear-gradient(135deg, #1e293b 0 5px, #8AB4F8 5px 10px); }
+  .avatar-frame-gemini { background: conic-gradient(from 210deg, #0B57D0, #8AB4F8, #C58AF9, #F28BFF, #4285F4, #0B57D0); background-size: 180% 180%; animation: frameGeminiPulse 3.6s ease-in-out infinite; box-shadow: 0 0 0 2px rgba(139, 92, 246, .16), 0 0 14px rgba(66, 133, 244, .42); }
+  .avatar-frame-orbit { background: conic-gradient(from 90deg, #34A853, #8AB4F8, #4285F4, #FBBC04, #34A853); background-size: 220% 220%; animation: frameOrbit 5s linear infinite; }
+  .avatar-frame-pixel { background: linear-gradient(90deg, #4285F4 0 25%, #EA4335 25% 50%, #FBBC04 50% 75%, #34A853 75%); background-size: 12px 12px; animation: framePixelShift 1.8s steps(3, end) infinite; }
+  .avatar-frame-network { background: radial-gradient(circle at 22% 22%, #fff 0 5%, transparent 6%), radial-gradient(circle at 77% 25%, #fff 0 5%, transparent 6%), radial-gradient(circle at 48% 78%, #fff 0 5%, transparent 6%), linear-gradient(135deg, #0F9D58, #34A853 40%, #8AB4F8 41%, #4285F4); background-size: 100% 100%, 100% 100%, 100% 100%, 200% 200%; animation: frameNetworkGlow 4s ease-in-out infinite; }
+  .avatar-frame-constellation { background: radial-gradient(circle at 18% 22%, #fff 0 4%, transparent 5%), radial-gradient(circle at 76% 28%, #fff 0 4%, transparent 5%), radial-gradient(circle at 46% 78%, #fff 0 4%, transparent 5%), linear-gradient(135deg, #17233A, #243B68 50%, #7E57C2); box-shadow: 0 0 0 2px rgba(147, 197, 253, .32), 0 0 16px rgba(126, 87, 194, .4); animation: frameConstellationTwinkle 2.8s ease-in-out infinite; }
+  .avatar-frame-chrome { background: conic-gradient(#EA4335 0 25%, #FBBC04 0 50%, #34A853 0 75%, #4285F4 0); animation: frameChromeSpin 7s linear infinite; }
+  .avatar-frame-android { background: linear-gradient(135deg, #1F9D55, #A4C639 38%, #E8F8C7 52%, #34A853); background-size: 220% 220%; animation: frameGoldGlow 4s ease-in-out infinite; }
+  .avatar-frame-cloud { background: radial-gradient(circle at 27% 27%, #fff 0 10%, transparent 11%), radial-gradient(circle at 60% 19%, #DCEEFF 0 14%, transparent 15%), linear-gradient(135deg, #4285F4, #8AB4F8 52%, #EAF3FF); box-shadow: 0 0 14px rgba(66,133,244,.35); animation: frameCloudDrift 4s ease-in-out infinite; }
+  .avatar-frame-firebase { background: linear-gradient(135deg, #FFCA28, #FF9100 35%, #F4511E 65%, #FFCA28); background-size: 240% 240%; animation: frameFire 2.8s ease-in-out infinite; }
+  .avatar-frame-maps { background: repeating-linear-gradient(0deg, transparent 0 8px, rgba(255,255,255,.7) 8px 10px), repeating-linear-gradient(90deg, #34A853 0 8px, #8AB4F8 8px 16px, #FBBC04 16px 24px); animation: frameMapsMove 2.4s linear infinite; }
+  .avatar-frame-codejam { background: repeating-linear-gradient(45deg, #4285F4 0 5px, #1e293b 5px 10px, #EA4335 10px 15px, #FBBC04 15px 20px); animation: framePixelShift 1.2s steps(4,end) infinite; }
+  .avatar-frame-community { background: radial-gradient(circle at 20% 25%, #EA4335 0 12%, transparent 13%), radial-gradient(circle at 78% 25%, #FBBC04 0 12%, transparent 13%), radial-gradient(circle at 50% 78%, #34A853 0 12%, transparent 13%), #4285F4; animation: frameCommunityBounce 3s ease-in-out infinite; }
+  .avatar-frame-prism { background: conic-gradient(from 45deg, #00C2FF, #8B5CF6, #F472B6, #FDE047, #34D399, #00C2FF); background-size: 220% 220%; animation: frameRainbowFlow 3.5s linear infinite; box-shadow: 0 0 16px rgba(139,92,246,.42); }
+  .avatar-frame-devfest { background: linear-gradient(135deg, #1e293b 0 30%, #4285F4 30% 43%, #EA4335 43% 56%, #FBBC04 56% 69%, #34A853 69%); background-size: 220% 220%; animation: frameDevfest 3s ease-in-out infinite; }
+  .avatar-frame-studio { background: linear-gradient(135deg, #FCE8E6, #F8BBD0 28%, #C5CAE9 52%, #B2DFDB 74%, #FFF9C4); background-size: 250% 250%; animation: frameGoldGlow 5s ease-in-out infinite; }
+  .avatar-frame-spark { background: radial-gradient(circle, #fff 0 10%, #FBBC04 11% 20%, transparent 21%), conic-gradient(#4285F4, #EA4335, #34A853, #4285F4); animation: frameSpark 1.8s ease-in-out infinite; box-shadow: 0 0 15px rgba(251,188,4,.55); }
+  .avatar-frame-material { background: linear-gradient(135deg, #4285F4 0 25%, #fff 25% 36%, #EA4335 36% 56%, #fff 56% 67%, #FBBC04 67% 82%, #34A853 82%); }
+  .avatar-frame-heart { background: radial-gradient(circle at 30% 27%, #fff 0 7%, transparent 8%), conic-gradient(from 25deg, #EA4335, #FF8A80, #FBBC04, #EA4335); animation: frameHeartBeat 2.2s ease-in-out infinite; box-shadow: 0 0 15px rgba(234,67,53,.42); }
+  .avatar-frame-applause { background: repeating-conic-gradient(from 5deg, #7E57C2 0 10deg, #C58AF9 10deg 20deg, #4285F4 20deg 30deg); animation: frameApplauseSpin 6s linear infinite; box-shadow: 0 0 16px rgba(126,87,194,.36); }
+  .avatar-frame-comet { background: linear-gradient(135deg, #17233A 0 35%, #4285F4 42%, #8AB4F8 51%, #fff 55%, #FBBC04 60%, #EA4335 72%, #17233A 82%); background-size: 240% 240%; animation: frameCometTrail 3.2s ease-in-out infinite; box-shadow: 0 0 17px rgba(66,133,244,.48); }
+  .avatar-frame-aura { background: radial-gradient(circle, #fff 0 17%, transparent 18%), conic-gradient(#C58AF9, #4285F4, #34A853, #FBBC04, #EA4335, #C58AF9); animation: frameAuraGlow 3s ease-in-out infinite; box-shadow: 0 0 18px rgba(197,138,249,.55); }
+  .avatar-frame-mosaic { background: conic-gradient(from 45deg, #4285F4 0 25%, #34A853 0 50%, #FBBC04 0 75%, #EA4335 0); background-size: 14px 14px; animation: frameMosaicShift 2.6s steps(4, end) infinite; }
+  /* Hard offset shadows for Neo-Brutalist student aesthetic */
+  .shadow-hard-black {
+    box-shadow: 5px 5px 0px #1e293b;
+  }
+  .shadow-hard-blue {
+    box-shadow: 5px 5px 0px #4285F4;
+  }
+  .shadow-hard-red {
+    box-shadow: 5px 5px 0px #EA4335;
+  }
+  .shadow-hard-yellow {
+    box-shadow: 5px 5px 0px #FBBC04;
+  }
+  .shadow-hard-green {
+    box-shadow: 5px 5px 0px #34A853;
+  }
+
+  .shadow-hard-hover {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .shadow-hard-hover:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 8px 8px 0px #1e293b;
+  }
+
+  /* Custom Floating Keyframe Animations */
+  .float-slow {
+    animation: floatSlow 5s ease-in-out infinite;
+  }
+
+  .float-medium {
+    animation: floatMedium 4s ease-in-out infinite;
+  }
+
+  .float-fast {
+    animation: floatFast 3s ease-in-out infinite;
+  }
+
+  .spin-slow {
+    animation: spinSlow 20s linear infinite;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .marquee {
+    animation: marquee 25s linear infinite;
+  }
+  .marquee:hover {
+    animation-play-state: paused;
+  }
 }
 
-@keyframes slide {
-  from {
-    background-position: 0 0;
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(3deg); }
+}
+
+@keyframes floatMedium {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(-4deg); }
+}
+
+@keyframes floatFast {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-8px) scale(1.05); }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes frameGoldGlow { 0%, 100% { background-position: 0% 50%; filter: saturate(1); } 50% { background-position: 100% 50%; filter: saturate(1.3) brightness(1.08); } }
+@keyframes frameRainbowFlow { from { background-position: 0% 50%; } to { background-position: 300% 50%; } }
+@keyframes frameGeminiPulse { 0%, 100% { background-position: 0% 50%; transform: scale(1); } 50% { background-position: 100% 50%; transform: scale(1.045); } }
+@keyframes frameOrbit { from { background-position: 0% 0%; } to { background-position: 220% 220%; } }
+@keyframes framePixelShift { 0%, 100% { background-position: 0 0; } 50% { background-position: 12px 12px; } }
+@keyframes frameNetworkGlow { 0%, 100% { background-position: 0 0, 0 0, 0 0, 0% 50%; } 50% { background-position: 0 0, 0 0, 0 0, 100% 50%; } }
+@keyframes frameConstellationTwinkle { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.3) saturate(1.2); } }
+@keyframes frameChromeSpin { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
+@keyframes frameCloudDrift { 0%,100% { transform: translateY(0); filter: brightness(1); } 50% { transform: translateY(-2px); filter: brightness(1.15); } }
+@keyframes frameFire { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes frameMapsMove { from { background-position: 0 0, 0 0; } to { background-position: 0 18px, 24px 0; } }
+@keyframes frameCommunityBounce { 0%,100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+@keyframes frameDevfest { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes frameSpark { 0%,100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.08); filter: brightness(1.25); } }
+@keyframes frameHeartBeat { 0%,100% { transform: scale(1); filter: saturate(1); } 45% { transform: scale(1.08); filter: saturate(1.3) brightness(1.08); } 65% { transform: scale(.99); } }
+@keyframes frameApplauseSpin { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
+@keyframes frameCometTrail { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes frameAuraGlow { 0%,100% { transform: rotate(0deg); filter: brightness(1); } 50% { transform: rotate(8deg); filter: brightness(1.22) saturate(1.2); } }
+@keyframes frameMosaicShift { 0%,100% { background-position: 0 0; } 50% { background-position: 14px 14px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-frame-gold, .avatar-frame-rainbow, .avatar-frame-gemini, .avatar-frame-orbit, .avatar-frame-pixel, .avatar-frame-network, .avatar-frame-constellation, .avatar-frame-chrome, .avatar-frame-android, .avatar-frame-cloud, .avatar-frame-firebase, .avatar-frame-maps, .avatar-frame-codejam, .avatar-frame-community, .avatar-frame-prism, .avatar-frame-devfest, .avatar-frame-studio, .avatar-frame-spark, .avatar-frame-heart, .avatar-frame-applause, .avatar-frame-comet, .avatar-frame-aura, .avatar-frame-mosaic { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .input-auth {
+    font-size: 1rem;
   }
-  to {
-    background-position: 256px 224px;
+
+  .button-primary, .button-secondary {
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+  }
+
+  .card-action {
+    min-height: 2.5rem;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .shadow-hard-black {
+    box-shadow: 3px 3px 0 #1e293b;
   }
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion) {
-  *,
-  ::before,
-  ::after {
-    animation: none !important;
-  }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
