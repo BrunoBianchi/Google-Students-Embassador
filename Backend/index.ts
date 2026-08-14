@@ -15,14 +15,16 @@ dotenv.config();
 export const app = express();
 const isProduction = process.env.NODE_ENV === "production";
 const canonicalFrontendOrigin = "https://google.studentembassador.com";
+const localFrontendOrigin = /^http:\/\/(?:[a-z0-9-]+\.)?localhost:3000$/i;
+const localApiHost = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i;
 const allowedOrigins = new Set(
   (process.env.FRONTEND_ORIGIN ?? (isProduction ? canonicalFrontendOrigin : "http://localhost:3000"))
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
 );
-const isAllowedOrigin = (origin: string) => allowedOrigins.has(origin)
-  || (!isProduction && /^http:\/\/(?:[a-z0-9-]+\.)?localhost:3000$/i.test(origin));
+const isAllowedOrigin = (origin: string, host?: string) => allowedOrigins.has(origin)
+  || (localFrontendOrigin.test(origin) && localApiHost.test(host ?? ""));
 
 app.disable("x-powered-by");
 app.use(helmet({
@@ -43,7 +45,7 @@ app.use((request, response, next) => {
   response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   response.setHeader("Cache-Control", "no-store");
 
-  if (origin && isAllowedOrigin(origin)) {
+  if (origin && isAllowedOrigin(origin, request.headers.host)) {
     response.setHeader("Access-Control-Allow-Origin", origin);
     response.setHeader("Access-Control-Allow-Credentials", "true");
     response.setHeader("Vary", "Origin");
@@ -52,14 +54,14 @@ app.use((request, response, next) => {
   }
 
   if (request.method === "OPTIONS") {
-    return origin && isAllowedOrigin(origin)
+    return origin && isAllowedOrigin(origin, request.headers.host)
       ? response.sendStatus(204)
       : response.sendStatus(403);
   }
 
   // State-changing browser requests must come from the configured frontend.
   // Requests without Origin (CLI/server-to-server) can still call the API.
-  if (origin && !isAllowedOrigin(origin)) {
+  if (origin && !isAllowedOrigin(origin, request.headers.host)) {
     return response.status(403).json({ error: "Origem não autorizada" });
   }
 
