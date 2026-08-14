@@ -36,7 +36,12 @@ const createInviteCode = async () => {
 
 export const ensureUserIndexes = async () => {
   const repository = userRepository();
-  const indexes = await repository.listCollectionIndexes().toArray();
+  const indexes = await repository.listCollectionIndexes().toArray().catch((error: unknown) => {
+    // MongoDB creates a collection on the first index write. A fresh database
+    // has no namespace to list yet, which is expected during first deploy.
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 26) return [];
+    throw error;
+  });
   const ensure = async (keys: Record<string, number>, options: Record<string, unknown>) => {
     if (!indexes.some((index) => hasSameKeys(index, keys))) {
       await repository.createCollectionIndex(keys as never, options as never);

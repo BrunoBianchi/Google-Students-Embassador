@@ -15,7 +15,10 @@ const hasSameKeys = (existing: { key?: Record<string, number> }, keys: Record<st
 
 export const ensureSessionIndexes = async () => {
   const repository = sessionRepository();
-  const indexes = await repository.listCollectionIndexes().toArray();
+  const indexes = await repository.listCollectionIndexes().toArray().catch((error: unknown) => {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 26) return [];
+    throw error;
+  });
   const ensure = async (keys: Record<string, number>, options: Record<string, unknown>) => {
     if (!indexes.some((index) => hasSameKeys(index, keys))) {
       await repository.createCollectionIndex(keys as never, options as never);
