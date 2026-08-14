@@ -114,6 +114,12 @@ export const issueEmailVerification = async (user: User) => {
   return token;
 };
 
+export const restoreEmailVerification = async (user: User, state: Pick<User, "emailVerificationTokenHash" | "emailVerificationExpiresAt">) => {
+  user.emailVerificationTokenHash = state.emailVerificationTokenHash;
+  user.emailVerificationExpiresAt = state.emailVerificationExpiresAt;
+  return await userRepository().save(user);
+};
+
 export const verifyEmail = async (token: string) => {
   const user = await userRepository().findOneBy({ emailVerificationTokenHash: tokenHash(token) });
   if (!user || !user.emailVerificationExpiresAt || user.emailVerificationExpiresAt.getTime() < Date.now()) throw new Error("Invalid or expired verification token");
@@ -131,6 +137,12 @@ export const issuePasswordReset = async (email: string) => {
   user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
   await userRepository().save(user);
   return { user, token };
+};
+
+export const restorePasswordReset = async (user: User, state: Pick<User, "passwordResetTokenHash" | "passwordResetExpiresAt">) => {
+  user.passwordResetTokenHash = state.passwordResetTokenHash;
+  user.passwordResetExpiresAt = state.passwordResetExpiresAt;
+  return await userRepository().save(user);
 };
 
 export const resetPassword = async (token: string, password: string) => {

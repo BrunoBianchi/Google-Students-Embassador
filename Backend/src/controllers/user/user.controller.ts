@@ -10,7 +10,7 @@ import { profileSchema } from "../../database/schemas/profile.schema";
 import { getAuthenticatedUserId, readCookie, requireAuth, SESSION_COOKIE_NAME, type AuthenticatedRequest } from "../middleware/auth.middleware";
 import { authRateLimit } from "../middleware/security.middleware";
 import { createServerSession, revokeServerSession } from "../../services/session.services";
-import { createUser, findUserByEmail, findUserById, issueEmailVerification, issuePasswordReset, listAmbassadors, loginUser, resetPassword, toggleAmbassadorLike, toggleProfileLike, unsubscribeEmailCategory, updateUserProfile, verifyEmail } from "../../services/user.services";
+import { createUser, findUserByEmail, findUserById, issueEmailVerification, issuePasswordReset, listAmbassadors, loginUser, resetPassword, restoreEmailVerification, restorePasswordReset, toggleAmbassadorLike, toggleProfileLike, unsubscribeEmailCategory, updateUserProfile, verifyEmail } from "../../services/user.services";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../../services/mail.services";
 import { getDashboard } from "../../services/community.services";
 import { getPublicProfile } from "../../services/community.services";
@@ -80,6 +80,20 @@ const startSession = async (user: User, response: Response, status: number) => {
   return response.status(status).cookie(SESSION_COOKIE_NAME, session.token, { ...sessionCookieOptions, expires: session.expiresAt }).json({ user: publicUser(user) });
 };
 
+const issueAndSendVerification = async (user: User) => {
+  const previous = {
+    emailVerificationTokenHash: user.emailVerificationTokenHash,
+    emailVerificationExpiresAt: user.emailVerificationExpiresAt,
+  };
+  const token = await issueEmailVerification(user);
+  try {
+    await sendVerificationEmail(user, token);
+  } catch (error) {
+    await restoreEmailVerification(user, previous);
+    throw error;
+  }
+};
+
 userController.post("/register", authRateLimit, upload.single("avatar"), async (request: Request, response: Response, next: NextFunction) => {
   try {
     if (request.file && !(await hasValidImageSignature(request.file.path))) {
@@ -87,9 +101,8 @@ userController.post("/register", authRateLimit, upload.single("avatar"), async (
     }
     const avatarPath = request.file ? `/uploads/avatars/${request.file.filename}` : undefined;
     const user = await createUser(userSchema.parse({ ...request.body, avatarPath }));
-    const token = await issueEmailVerification(user);
     try {
-      await sendVerificationEmail(user, token);
+      await issueAndSendVerification(user);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("Mailgun")) {
         return response.status(202).json({
@@ -122,8 +135,7 @@ userController.post("/email-verification/resend", authRateLimit, async (request:
     const { email } = emailSchema.parse(request.body);
     const user = await findUserByEmail(email);
     if (user && !user.emailVerifiedAt) {
-      const token = await issueEmailVerification(user);
-      await sendVerificationEmail(user, token);
+      await issueAndSendVerification(user);
     }
     return response.json({ message: "Se houver uma conta pendente para este e-mail, enviaremos um novo link de confirma\u00e7\u00e3o." });
   } catch (error) {
@@ -134,8 +146,19 @@ userController.post("/email-verification/resend", authRateLimit, async (request:
 userController.post("/password-reset/request", authRateLimit, async (request: Request, response: Response, next: NextFunction) => {
   try {
     const { email } = emailSchema.parse(request.body);
-    const result = await issuePasswordReset(email);
-    if (result) await sendPasswordResetEmail(result.user, result.token);
+    const user = await findUserByEmail(email);
+    if (user) {
+      const previous = { passwordResetTokenHash: user.passwordResetTokenHash, passwordResetExpiresAt: user.passwordResetExpiresAt };
+      const result = await issuePasswordReset(email);
+      if (result) {
+        try {
+          await sendPasswordResetEmail(result.user, result.token);
+        } catch (error) {
+          await restorePasswordReset(result.user, previous);
+          throw error;
+        }
+      }
+    }
     return response.json({ message: "Se este e-mail estiver cadastrado, enviaremos as instru\u00e7\u00f5es para redefinir a senha." });
   } catch (error) {
     return next(error);

@@ -99,7 +99,7 @@ const AccountActionPage = ({ action }: Props) => {
 
           {loading && <p className="mt-7 rounded-xl bg-[#ebf3fe] px-4 py-3 text-sm font-bold text-[#264f91]">Estamos concluindo sua solicita\u00e7\u00e3o...</p>}
           {status && <div className="mt-7 rounded-2xl border border-[#34a853]/30 bg-[#edf8f0] p-4 text-sm font-bold text-[#18723a]"><CheckCircle2 className="mr-2 inline-block" size={19} />{status}</div>}
-          {error && <p role="alert" className="mt-7 rounded-2xl border border-[#ea4335]/30 bg-[#fdf0ef] p-4 text-sm font-bold text-[#b3261e]">{error}</p>}
+          {error && <div role="alert" className="mt-7 rounded-2xl border border-[#ea4335]/30 bg-[#fdf0ef] p-4 text-sm font-bold text-[#b3261e]"><p>{error}</p>{action === "verify" && <a href="/login" className="mt-3 inline-flex font-black text-[#4285f4] hover:underline">Solicitar novo link de confirmação</a>}</div>}
           {status && <div className="mt-6 flex flex-wrap gap-3"><a href={action === "verify" ? "/dashboard" : "/login"} className="button-primary">{action === "verify" ? "Ir para o Hub" : "Ir para entrar"}</a>{action === "forgot" && <a href="/login" className="button-secondary">Voltar</a>}</div>}
         </div>
       </section>
