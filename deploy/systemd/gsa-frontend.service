@@ -1,0 +1,21 @@
+[Unit]
+Description=Google Student Ambassador Hub frontend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gsa
+Group=gsa
+WorkingDirectory=/opt/google-student-ambassador/Frontend
+EnvironmentFile=/opt/google-student-ambassador/Frontend/.env
+ExecStart=/usr/local/bin/bun src/index.ts
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=Google Student Ambassador Hub API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gsa
+Group=gsa
+WorkingDirectory=/opt/google-student-ambassador/Backend
+EnvironmentFile=/opt/google-student-ambassador/Backend/.env
+ExecStart=/usr/local/bin/bun index.ts
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/opt/google-student-ambassador/Backend/uploads
+
+[Install]
+WantedBy=multi-user.target

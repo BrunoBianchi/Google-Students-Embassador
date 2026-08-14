@@ -3,16 +3,29 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "start": "bun index.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/express": "^5.0.6"
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@langchain/openai": "^1.5.7",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "typeorm": "^1.1.0"
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.8",
+    "langchain": "^1.5.8",
+    "mongodb": "^6.21.0",
+    "multer": "^2.2.0",
+    "typeorm": "^1.1.0",
+    "zod": "^4.4.3"
   }
 }
