@@ -48,6 +48,8 @@ const eventBaseSchema = z.object({
   state: optionalEventState,
   coordinates: eventCoordinates,
   capacity: optionalCapacity,
+  visibility: z.enum(["GLOBAL", "CAMPUS"]).default("GLOBAL"),
+  campusId: z.string().regex(/^[a-f\d]{24}$/i).optional(),
   imageUrls: z.array(imageUrl).max(5).default([]),
   tags: z.array(z.enum(eventTagValues)).max(5).default([]),
   organizerIds: z.array(z.string().regex(/^[a-f\d]{24}$/i)).max(50).default([]),
@@ -61,7 +63,11 @@ export const eventSchema = eventBaseSchema.refine(
 ).refine(
   (event) => !event.coordinates || Boolean(event.city && event.state),
   { path: ["coordinates"], message: "Informe cidade e UF ao marcar um ponto no mapa." },
+).refine(
+  (event) => event.visibility !== "CAMPUS" || Boolean(event.campusId),
+  { path: ["campusId"], message: "Selecione o campus para eventos com visibilidade local." },
 );
+
 
 export const eventUpdateSchema = eventBaseSchema
   .omit({ organizerIds: true, groupId: true, createForum: true })

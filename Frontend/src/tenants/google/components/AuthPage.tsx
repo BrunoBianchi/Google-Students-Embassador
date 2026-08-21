@@ -1,7 +1,8 @@
-import React, { type ChangeEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, Building2, Check, ChevronLeft, Eye, EyeOff, ImagePlus, LockKeyhole, Mail, Search, UserRound, UsersRound, X } from 'lucide-react';
+import React, { type FormEvent, useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Building2, Check, ChevronLeft, Eye, EyeOff, LockKeyhole, Mail, Search, UserRound, UsersRound, X } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { authApi, type University } from '../../../services/auth';
+import Logo from './Logo';
 
 type AuthMode = 'login' | 'register';
 type AccountType = 'ambassador' | 'student';
@@ -19,15 +20,16 @@ type RegistrationDraft = {
   selectedUniversity: University | null;
   creatingUniversity: boolean;
   groupCode: string;
+  groupInviteCode: string;
   email: string;
   agreed: boolean;
-  emailUpdates: '' | 'yes' | 'no';
+  emailUpdates: boolean;
 };
 
-const draftKey = 'gsa-register-draft-v1';
+const draftKey = 'campus-register-draft-v1';
 const defaultDraft: RegistrationDraft = {
   step: 1, name: '', nickname: '', birth: '', state: '', city: '', userType: null, universityQuery: '',
-  selectedUniversity: null, creatingUniversity: false, groupCode: '', email: '', agreed: false, emailUpdates: '',
+  selectedUniversity: null, creatingUniversity: false, groupCode: '', groupInviteCode: '', email: '', agreed: false, emailUpdates: false,
 };
 
 const steps = ['Conta', 'Perfil', 'Acesso'];
@@ -37,9 +39,14 @@ const brazilianStateOptions = [
 
 const loadDraft = (): RegistrationDraft => {
   try {
-    const saved = sessionStorage.getItem(draftKey);
-    if (!saved) return defaultDraft;
-    return { ...defaultDraft, ...JSON.parse(saved), step: Math.min(Math.max(Number(JSON.parse(saved).step) || 1, 1), 3) };
+    const queryCode = new URLSearchParams(window.location.search).get('groupCode')?.trim().toUpperCase() ?? '';
+    const saved = sessionStorage.getItem(draftKey) || sessionStorage.getItem('gsa-register-draft-v1');
+    const restored = saved ? JSON.parse(saved) : {};
+    const base = { ...defaultDraft, ...restored, step: Math.min(Math.max(Number(restored.step) || 1, 1), 3) };
+    const match = queryCode.match(/^G(0[1-9]|10)-[A-HJ-NP-Z2-9]{6}$/);
+    return match
+      ? { ...base, userType: 'ambassador', groupCode: String(Number(match[1])), groupInviteCode: queryCode }
+      : base;
   } catch {
     return defaultDraft;
   }
@@ -54,10 +61,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
   const [status, setStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [universities, setUniversities] = useState<University[]>([]);
-  const [avatar, setAvatar] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState('');
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateDraft = (changes: Partial<RegistrationDraft>) => {
     setDraft((current) => ({ ...current, ...changes }));
@@ -67,6 +70,15 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
   useEffect(() => {
     if (!isLogin) sessionStorage.setItem(draftKey, JSON.stringify(draft));
   }, [draft, isLogin]);
+
+  useEffect(() => {
+    if (isLogin || !draft.groupInviteCode) return;
+    let active = true;
+    authApi.validateGroupInviteCode(draft.groupInviteCode)
+      .then(({ groupNumber }) => active && setDraft((current) => ({ ...current, userType: 'ambassador', groupCode: String(groupNumber) })))
+      .catch(() => active && setStatus('O código de convite informado na URL é inválido ou expirou.'));
+    return () => { active = false; };
+  }, [draft.groupInviteCode, isLogin]);
 
   useEffect(() => {
     if (isLogin || draft.universityQuery.trim().length < 2 || draft.selectedUniversity || draft.creatingUniversity) {
@@ -82,37 +94,28 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     return () => { active = false; window.clearTimeout(timer); };
   }, [draft.creatingUniversity, draft.selectedUniversity, draft.universityQuery, isLogin]);
 
-  useEffect(() => {
-    if (!avatar) return setAvatarPreview('');
-    const previewUrl = URL.createObjectURL(avatar);
-    setAvatarPreview(previewUrl);
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [avatar]);
-
-  const chooseAvatar = (file?: File) => {
-    if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 4 * 1024 * 1024) {
-      setStatus('Escolha uma imagem PNG, JPEG ou WebP de até 4 MB.');
-      return;
-    }
-    setAvatar(file);
-    setStatus('');
-  };
-
-  const validateStep = (step: number) => {
-    if (step === 1 && (draft.name.trim().length < 2 || !draft.userType)) {
-      setStatus('Informe seu nome e escolha seu tipo de participação.');
-      return false;
+  const validateStep = (step: number): boolean => {
+    if (step === 1) {
+      if (!draft.name.trim()) { setStatus('Informe seu nome completo.'); return false; }
+      if (!draft.userType) { setStatus('Selecione seu tipo de participação.'); return false; }
+      return true;
     }
     if (step === 2) {
       if (!draft.birth) { setStatus('Informe sua data de nascimento.'); return false; }
-      if (!brazilianStateOptions.some(([code]) => code === draft.state) || draft.city.trim().length < 2) { setStatus('Informe um estado (UF) válido e sua cidade.'); return false; }
-      if (!draft.selectedUniversity && !draft.creatingUniversity) { setStatus('Selecione a sua universidade.'); return false; }
-      if (draft.creatingUniversity && draft.universityQuery.trim().length < 3) { setStatus('Informe o nome completo da nova universidade.'); return false; }
+      const age = (Date.now() - new Date(draft.birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      if (Number.isNaN(age) || age < 16) { setStatus('Você precisa ter pelo menos 16 anos para se cadastrar.'); return false; }
+      if (!draft.state || !draft.city.trim()) { setStatus('Informe estado e cidade.'); return false; }
+      if (!draft.selectedUniversity && !draft.creatingUniversity) {
+        setStatus(draft.userType === 'ambassador' ? 'Selecione ou crie sua universidade.' : 'Selecione sua universidade.');
+        return false;
+      }
+      return true;
     }
-    if (step === 3 && (!draft.email || password.length < 8 || !draft.agreed || !draft.emailUpdates)) {
-      setStatus('Informe um e-mail, uma senha de ao menos 8 caracteres e aceite os termos.');
-      return false;
+    if (step === 3) {
+      if (!draft.email.includes('@')) { setStatus('Informe um e-mail válido.'); return false; }
+      if (password.length < 8) { setStatus('A senha precisa ter pelo menos 8 caracteres.'); return false; }
+      if (!draft.agreed) { setStatus('Você precisa aceitar os Termos de Uso e a Política de Privacidade.'); return false; }
+      return true;
     }
     return true;
   };
@@ -135,13 +138,13 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     formData.set('email', draft.email);
     formData.set('password', password);
     formData.set('termsAccepted', String(draft.agreed));
-    formData.set('emailUpdates', String(draft.emailUpdates === 'yes'));
+    formData.set('emailUpdates', String(draft.emailUpdates));
     if (draft.selectedUniversity) formData.set('universityId', draft.selectedUniversity.id);
     if (draft.creatingUniversity) formData.set('newUniversityName', draft.universityQuery);
-    if (draft.userType === 'ambassador' && draft.groupCode) formData.set('groupCode', draft.groupCode);
+    if (draft.userType === 'ambassador' && draft.groupCode) formData.set('groupNumber', draft.groupCode);
+    if (draft.userType === 'ambassador' && draft.groupInviteCode) formData.set('groupInviteCode', draft.groupInviteCode);
     const referralCode = new URLSearchParams(window.location.search).get('ref')?.trim().toUpperCase();
     if (referralCode && /^[A-Z0-9]{8}$/.test(referralCode)) formData.set('referralCode', referralCode);
-    if (avatar) formData.set('avatar', avatar);
 
     setIsSubmitting(true);
     setStatus('');
@@ -187,6 +190,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
   const selectAccountType = (userType: AccountType) => updateDraft({
     userType,
     groupCode: userType === 'student' ? '' : draft.groupCode,
+    groupInviteCode: userType === 'student' ? '' : draft.groupInviteCode,
     creatingUniversity: userType === 'student' ? false : draft.creatingUniversity,
   });
 
@@ -194,25 +198,32 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
   return (
     <main className="min-h-screen bg-[#FAFAFE] text-[#1e293b] relative px-3 py-4 sm:px-6 sm:py-8">
-      <div className="absolute top-0 left-0 right-0 grid grid-cols-4 h-2.5"><div className="bg-[#4285F4]" /><div className="bg-[#EA4335]" /><div className="bg-[#FBBC04]" /><div className="bg-[#34A853]" /></div>
+      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#4F46E5] via-[#06B6D4] to-[#10B981]" />
       <div className="relative max-w-5xl mx-auto">
         <header className="flex items-center justify-between py-3 sm:py-4">
-          <a href="/" aria-label="Voltar para a página inicial"><img src="/logo.png" alt="Google Student Ambassador" className="h-8 sm:h-10 w-auto object-contain" /></a>
-          <a href="/" className="inline-flex items-center gap-2 text-xs sm:text-sm font-black hover:text-[#4285F4]"><ArrowLeft size={16} /> Voltar ao Hub</a>
+          <a href="/" aria-label="Voltar para a página inicial"><Logo size="md" /></a>
+          <a href="/" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-slate-600 hover:text-[#4F46E5]"><ArrowLeft size={16} />Voltar ao início</a>
         </header>
 
-        <section className="mt-5 sm:mt-8 grid items-start gap-5 lg:grid-cols-[290px_minmax(0,1fr)]">
-          <aside className="hidden lg:block sticky top-8 rounded-3xl border-3 border-[#1e293b] bg-[#1e293b] p-8 text-white shadow-hard-black">
-            <span className="inline-flex bg-[#FBBC04] text-[#1e293b] text-xs font-black uppercase tracking-wider px-3 py-1 rounded-md -rotate-2">GSA Brasil Hub</span>
-            <h1 className="mt-5 text-3xl font-black leading-tight">{isLogin ? 'Que bom ter você de volta.' : 'Sua comunidade começa aqui.'}</h1>
-            <p className="mt-4 text-sm leading-relaxed text-slate-300 font-medium">{isLogin ? 'Entre para acompanhar sua rede local.' : 'Três etapas rápidas para completar seu perfil.'}</p>
-            {!isLogin && <ol className="mt-7 space-y-4">{steps.map((label, index) => <li key={label} className={`flex items-center gap-3 text-sm font-black ${draft.step >= index + 1 ? 'text-white' : 'text-slate-500'}`}><span className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${draft.step > index + 1 ? 'bg-[#34A853] border-[#34A853]' : draft.step === index + 1 ? 'border-[#FBBC04] text-[#FBBC04]' : 'border-slate-600'}`}>{draft.step > index + 1 ? <Check size={15} /> : index + 1}</span>{label}</li>)}</ol>}
-          </aside>
+        <section className="mt-4 sm:mt-6 overflow-hidden rounded-3xl border-2 border-[#1e293b] bg-white shadow-[6px_6px_0px_0px_#1e293b]">
+          <div className="grid lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="bg-[#EEF2FF] p-6 sm:p-10 border-b-2 lg:border-b-0 lg:border-r-2 border-[#1e293b] flex flex-col justify-between">
+              <div>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4F46E5]/40 bg-white px-3 py-1 text-2xs sm:text-xs font-black uppercase text-[#4F46E5]">Comunidade Estudantil 2026</span>
+                <h1 className="mt-4 text-2xl sm:text-3xl font-black leading-tight text-[#1e293b]">Sua rede independente de universitários e embaixadores.</h1>
+                <p className="mt-3 text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">Conecte-se por campus, organize eventos acadêmicos, compartilhe conhecimento em IA e colabore em âmbito nacional.</p>
+                <ul className="mt-6 space-y-3 text-xs font-bold text-slate-700">
+                  <li className="flex items-center gap-2"><Check size={16} className="text-[#10B981]" />Espaços dedicados para cada universidade</li>
+                  <li className="flex items-center gap-2"><Check size={16} className="text-[#10B981]" />Ambiente seguro e aderente à LGPD</li>
+                  <li className="flex items-center gap-2"><Check size={16} className="text-[#10B981]" />Certificados e trilhas de aprendizagem</li>
+                </ul>
+              </div>
+              <div className="mt-8 pt-4 border-t border-indigo-100 text-2xs text-slate-500 font-medium">Plataforma independente criada pela comunidade estudantil.</div>
+            </div>
 
-          <div className="rounded-3xl border-3 border-[#1e293b] bg-white p-6 sm:p-8 shadow-hard-black">
-            <div className="max-w-xl mx-auto">
-              {!isLogin && <div className="mb-6"><div className="flex justify-between text-xs font-black uppercase tracking-wider text-slate-500"><span>Cadastro</span><span>Etapa {draft.step} de 3</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-[#4285F4] transition-all duration-300" style={{ width: `${(draft.step / 3) * 100}%` }} /></div></div>}
-              <span className="text-xs font-black uppercase tracking-wider text-[#4285F4]">{isLogin ? 'Acesse sua conta' : `Etapa ${draft.step}: ${steps[draft.step - 1]}`}</span>
+            <div className="p-6 sm:p-10">
+              {!isLogin && <div className="mb-6"><div className="flex justify-between text-xs font-black uppercase tracking-wider text-slate-500"><span>Cadastro</span><span>Etapa {draft.step} de 3</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-[#4F46E5] transition-all duration-300" style={{ width: `${(draft.step / 3) * 100}%` }} /></div></div>}
+              <span className="text-xs font-black uppercase tracking-wider text-[#4F46E5]">{isLogin ? 'Acesse sua conta' : `Etapa ${draft.step}: ${steps[draft.step - 1]}`}</span>
               <h2 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight">{isLogin ? 'Entrar no Hub' : draft.step === 1 ? 'Vamos começar' : draft.step === 2 ? 'Seu perfil no campus' : 'Proteja seu acesso'}</h2>
               <p className="mt-3 text-sm text-slate-600 font-medium">{isLogin ? 'Entre com seu e-mail e senha para acessar a comunidade.' : draft.step === 1 ? 'Conte como você participa da comunidade.' : draft.step === 2 ? 'Essas informações ajudam a conectar sua rede local.' : 'Revise e crie sua conta.'}</p>
 
@@ -230,19 +241,76 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                 {!isLogin && draft.step === 2 && <>
                   <div className="grid gap-4 sm:grid-cols-2"><label className="block"><span className="mb-2 block text-sm font-black">Apelido <em className="font-medium text-slate-500">(opcional)</em></span><input value={draft.nickname} onChange={(event) => updateDraft({ nickname: event.target.value })} maxLength={40} placeholder="Como quer aparecer?" className="input-auth" /></label><label className="block"><span className="mb-2 block text-sm font-black">Nascimento</span><input required value={draft.birth} onChange={(event) => updateDraft({ birth: event.target.value })} type="date" max={new Date().toISOString().slice(0, 10)} className="input-auth" /></label></div>
                   <div className="grid gap-4 sm:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]"><label className="block"><span className="mb-2 block text-sm font-black">Estado (UF)</span><select required value={draft.state} onChange={(event) => updateDraft({ state: event.target.value })} className="input-auth"><option value="">Selecione</option>{brazilianStateOptions.map(([code, name]) => <option key={code} value={code}>{code} — {name}</option>)}</select></label><label className="block"><span className="mb-2 block text-sm font-black">Cidade</span><input required value={draft.city} onChange={(event) => updateDraft({ city: event.target.value })} maxLength={100} autoComplete="address-level2" placeholder="Ex.: Belo Horizonte" className="input-auth" /></label></div>
-                  <UniversityPicker draft={draft} universities={universities} onInput={universityInput} onSelect={(university) => { updateDraft({ selectedUniversity: university, universityQuery: university.name, creatingUniversity: false }); setUniversities([]); }} onCreate={() => { updateDraft({ creatingUniversity: true }); setUniversities([]); }} onClear={() => updateDraft({ selectedUniversity: null, universityQuery: '' })} />
-                  {draft.userType === 'ambassador' && <label className="block"><span className="mb-2 block text-sm font-black">Código de grupo <em className="font-medium text-slate-500">(opcional)</em></span><input value={draft.groupCode} onChange={(event) => updateDraft({ groupCode: event.target.value })} maxLength={64} placeholder="Ex.: GSA-SP-2026" className="input-auth" /></label>}
-                  <AvatarDropzone avatar={avatar} avatarPreview={avatarPreview} dragActive={dragActive} setDragActive={setDragActive} fileInputRef={fileInputRef} chooseAvatar={chooseAvatar} clearAvatar={() => setAvatar(null)} />
-                  <p className="rounded-xl border border-[#FBBC04]/40 bg-[#FFF8E7] px-3 py-2 text-xs font-medium text-slate-700">O rascunho deste formulário é salvo automaticamente. Por segurança, a imagem precisa ser escolhida novamente após recarregar.</p>
+                  {draft.userType === 'ambassador' && (
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-black">
+                        Grupo de Embaixadores <em className="font-medium text-slate-500">(Grupo 1 até 10)</em>
+                      </span>
+                      <select
+                        value={draft.groupCode}
+                        onChange={(event) => updateDraft({ groupCode: event.target.value, groupInviteCode: '' })}
+                        className="input-auth"
+                      >
+                        <option value="">Selecione seu grupo (opcional)</option>
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
+                          <option key={num} value={String(num)}>
+                            Grupo {num}
+                          </option>
+                        ))}
+                      </select>
+                      {draft.groupInviteCode && <span className="mt-2 flex items-center gap-2 rounded-xl border border-[#34A853]/30 bg-[#E6F4EA] px-3 py-2 text-xs font-black text-[#137333]"><Check size={14} /> Convite {draft.groupInviteCode} aplicado ao Grupo {draft.groupCode}</span>}
+                      <span className="mt-1.5 block text-2xs text-slate-500 font-medium">
+                        Caso não escolha agora, você poderá definir seu grupo uma única vez nas configurações do seu perfil.
+                      </span>
+                    </label>
+                  )}
                 </>}
 
                 {!isLogin && draft.step === 3 && <>
-                  <div className="rounded-xl bg-[#EBF3FE] p-4 text-sm"><strong>{draft.name}</strong>{draft.nickname && ` · ${draft.nickname}`}<br /><span className="text-slate-600">{draft.userType === 'ambassador' ? 'Embaixador estudantil' : 'Estudante'} · {draft.selectedUniversity?.name ?? draft.universityQuery.toLowerCase()}</span></div>
-                  <label className="block"><span className="mb-2 block text-sm font-black">E-mail</span><span className="relative block"><Mail size={18} className="input-icon absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input required value={draft.email} onChange={(event) => updateDraft({ email: event.target.value })} type="email" autoComplete="email" placeholder="voce@universidade.edu.br" className="input-auth input-auth-leading-icon" /></span></label>
+                  <div className="rounded-2xl bg-[#EEF2FF] p-4 text-xs sm:text-sm border border-[#4F46E5]/20">
+                    <strong className="text-slate-900 font-black">{draft.name}</strong>{draft.nickname && ` · ${draft.nickname}`}<br />
+                    <span className="text-slate-600 font-medium">{draft.userType === 'ambassador' ? 'Embaixador estudantil 2026' : 'Estudante'} · {draft.selectedUniversity?.name ?? draft.universityQuery.toLowerCase()}</span>
+                  </div>
+
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-black">E-mail institucional ou de acesso</span>
+                    <span className="relative block">
+                      <Mail size={18} className="input-icon absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input required value={draft.email} onChange={(event) => updateDraft({ email: event.target.value })} type="email" autoComplete="email" placeholder="voce@universidade.edu.br" className="input-auth input-auth-leading-icon" />
+                    </span>
+                  </label>
+
                   <PasswordField password={password} setPassword={setPassword} showPassword={showPassword} setShowPassword={setShowPassword} />
-                  <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-600 font-medium"><input required checked={draft.agreed} onChange={(event) => updateDraft({ agreed: event.target.checked })} type="checkbox" className="mt-0.5 accent-[#4285F4]" />Li e aceito os <a href="/terms" target="_blank" rel="noreferrer" className="font-black text-[#4285F4] hover:underline">Termos de Uso</a> e a <a href="/privacy" target="_blank" rel="noreferrer" className="font-black text-[#4285F4] hover:underline">Política de Privacidade</a>.</label>
-                  <label className="block"><span className="mb-2 block text-sm font-black">Deseja receber comunicações por e-mail?</span><select required value={draft.emailUpdates} onChange={(event) => updateDraft({ emailUpdates: event.target.value as RegistrationDraft['emailUpdates'] })} className="input-auth"><option value="">Selecione uma opção</option><option value="yes">Sim, quero receber atualizações de eventos, fóruns e novidades</option><option value="no">Não, apenas e-mails essenciais de confirmação e segurança</option></select><span className="mt-2 block text-xs font-medium leading-relaxed text-slate-500">Você poderá cancelar tipos específicos de atualização pelos links enviados em cada e-mail.</span></label>
-                  <p className="text-xs text-slate-500">A senha não é salva no rascunho por segurança.</p>
+
+                  {/* Minimalist Checkboxes */}
+                  <div className="space-y-3 pt-2">
+                    <label className="flex items-start gap-2.5 text-xs leading-relaxed text-slate-700 font-medium cursor-pointer select-none">
+                      <input
+                        required
+                        checked={draft.agreed}
+                        onChange={(event) => updateDraft({ agreed: event.target.checked })}
+                        type="checkbox"
+                        className="mt-0.5 w-4 h-4 rounded border-2 border-slate-300 accent-[#4285F4] cursor-pointer shrink-0"
+                      />
+                      <span>
+                        Li e concordo com os <a href="/terms" target="_blank" rel="noreferrer" className="font-black text-[#4285F4] hover:underline">Termos de Uso</a> e com a <a href="/privacy" target="_blank" rel="noreferrer" className="font-black text-[#34A853] hover:underline">Política de Privacidade</a>
+                      </span>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 text-xs leading-relaxed text-slate-700 font-medium cursor-pointer select-none">
+                      <input
+                        checked={draft.emailUpdates}
+                        onChange={(event) => updateDraft({ emailUpdates: event.target.checked })}
+                        type="checkbox"
+                        className="mt-0.5 w-4 h-4 rounded border-2 border-slate-300 accent-[#4285F4] cursor-pointer shrink-0"
+                      />
+                      <span>
+                        Eu desejo receber comunicação via e-mail
+                      </span>
+                    </label>
+                  </div>
+
+                  <p className="text-2xs text-slate-400">Por segurança, sua senha nunca é gravada em rascunhos temporários.</p>
                 </>}
 
                 <div className="flex gap-3 pt-1">
@@ -250,23 +318,21 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                   <button disabled={isSubmitting} type="submit" className="button-primary flex-1">{isSubmitting ? 'Aguarde…' : isLogin ? 'Entrar no Hub' : draft.step === 3 ? 'Criar minha conta' : 'Avançar'} <ArrowRight size={18} /></button>
                 </div>
               </form>
-              {status && <div role="status" className="mt-5 rounded-xl bg-[#EBF3FE] px-4 py-3 text-xs font-bold border border-[#4285F4]/30"><p>{status}</p>{isLogin && draft.email && <button type="button" disabled={isSubmitting} onClick={resendVerification} className="mt-2 font-black text-[#4285F4] hover:underline">Reenviar confirmação por e-mail</button>}</div>}
-              <p className="mt-6 text-center text-sm font-medium text-slate-600">{isLogin ? 'Ainda não tem uma conta?' : 'Já possui uma conta?'} <a href={isLogin ? '/register' : '/login'} className="font-black text-[#4285F4] hover:underline">{isLogin ? 'Cadastre-se' : 'Entrar'}</a></p>
+              {status && <div role="status" className="mt-5 rounded-xl bg-[#EEF2FF] px-4 py-3 text-xs font-bold border border-[#4F46E5]/30"><p>{status}</p>{isLogin && draft.email && <button type="button" disabled={isSubmitting} onClick={resendVerification} className="mt-2 font-black text-[#4F46E5] hover:underline">Reenviar confirmação por e-mail</button>}</div>}
+              <p className="mt-6 text-center text-sm font-medium text-slate-600">{isLogin ? 'Ainda não tem uma conta?' : 'Já possui uma conta?'} <a href={isLogin ? '/register' : '/login'} className="font-black text-[#4F46E5] hover:underline">{isLogin ? 'Cadastre-se' : 'Entrar'}</a></p>
             </div>
           </div>
         </section>
-        <p className="mt-8 text-center text-xs text-slate-500 font-medium">Projeto acadêmico independente, sem vínculo oficial com a Google LLC.</p>
+        <p className="mt-8 text-center text-xs text-slate-500 font-medium">Campus Ambassador Hub · Projeto independente sem vínculo oficial com a Google LLC ou Amplifica.</p>
       </div>
     </main>
   );
 };
 
-const PasswordField = ({ password, setPassword, showPassword, setShowPassword, login = false }: { password: string; setPassword: (value: string) => void; showPassword: boolean; setShowPassword: (value: boolean | ((current: boolean) => boolean)) => void; login?: boolean }) => <label className="block"><span className="mb-2 flex justify-between text-sm font-black">Senha{login && <a href="/forgot-password" className="text-xs text-[#4285F4] hover:underline">Esqueci minha senha</a>}</span><span className="relative block"><LockKeyhole size={18} className="input-icon absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input required value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} type={showPassword ? 'text' : 'password'} autoComplete={login ? 'current-password' : 'new-password'} placeholder="Mínimo de 8 caracteres" className="input-auth input-auth-leading-and-trailing-icon" /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 p-1.5 text-slate-500">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>;
+const PasswordField = ({ password, setPassword, showPassword, setShowPassword, login = false }: { password: string; setPassword: (value: string) => void; showPassword: boolean; setShowPassword: (value: boolean | ((current: boolean) => boolean)) => void; login?: boolean }) => <label className="block"><span className="mb-2 flex justify-between text-sm font-black">Senha{login && <a href="/forgot-password" className="text-xs text-[#4F46E5] hover:underline">Esqueci minha senha</a>}</span><span className="relative block"><LockKeyhole size={18} className="input-icon absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input required value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} type={showPassword ? 'text' : 'password'} autoComplete={login ? 'current-password' : 'new-password'} placeholder="Mínimo de 8 caracteres" className="input-auth input-auth-leading-and-trailing-icon" /><button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 p-1.5 text-slate-500">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>;
 
-const AccountTypeCard = ({ selected, onClick, type }: { selected: boolean; onClick: () => void; type: AccountType }) => { const ambassador = type === 'ambassador'; return <button type="button" onClick={onClick} className={`rounded-xl border-2 p-4 text-left ${selected ? ambassador ? 'border-[#4285F4] bg-[#EBF3FE]' : 'border-[#34A853] bg-[#EFFBF3]' : 'border-slate-200 hover:border-[#4285F4]/50'}`}>{ambassador ? <UsersRound size={21} className="mb-2 text-[#4285F4]" /> : <UserRound size={21} className="mb-2 text-[#34A853]" />}<strong className="block text-sm">{ambassador ? 'Sim, sou embaixador' : 'Sou estudante'}</strong><span className="text-xs text-slate-600">{ambassador ? 'Posso criar universidade e entrar em grupos.' : 'Posso descobrir eventos e a comunidade.'}</span></button>; };
+const AccountTypeCard = ({ selected, onClick, type }: { selected: boolean; onClick: () => void; type: AccountType }) => { const ambassador = type === 'ambassador'; return <button type="button" onClick={onClick} className={`rounded-xl border-2 p-4 text-left ${selected ? ambassador ? 'border-[#4F46E5] bg-[#EEF2FF]' : 'border-[#10B981] bg-[#EFFBF3]' : 'border-slate-200 hover:border-[#4F46E5]/50'}`}>{ambassador ? <UsersRound size={21} className="mb-2 text-[#4F46E5]" /> : <UserRound size={21} className="mb-2 text-[#10B981]" />}<strong className="block text-sm">{ambassador ? 'Sim, sou embaixador' : 'Sou estudante'}</strong><span className="text-xs text-slate-600">{ambassador ? 'Posso cadastrar iniciativas e criar grupos.' : 'Posso descobrir eventos e a comunidade.'}</span></button>; };
 
-const UniversityPicker = ({ draft, universities, onInput, onSelect, onCreate, onClear }: { draft: RegistrationDraft; universities: University[]; onInput: (value: string) => void; onSelect: (university: University) => void; onCreate: () => void; onClear: () => void }) => <div className="relative"><span className="mb-2 block text-sm font-black">Universidade</span><span className="relative block"><Search size={18} className="input-icon absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input value={draft.universityQuery} onChange={(event) => onInput(event.target.value)} placeholder="Busque sua universidade" className="input-auth input-auth-leading-icon" /></span>{draft.selectedUniversity && <div className="mt-2 flex items-center justify-between rounded-lg bg-[#EFFBF3] px-3 py-2 text-sm font-bold"><span>{draft.selectedUniversity.name}</span><button type="button" onClick={onClear} aria-label="Remover universidade"><X size={16} /></button></div>}{universities.length > 0 && <div className="absolute z-20 mt-1 w-full rounded-xl border-2 border-[#1e293b] bg-white p-1 shadow-lg">{universities.map((university) => <button type="button" key={university.id} onClick={() => onSelect(university)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#EBF3FE]">{university.name}</button>)}</div>}{draft.userType === 'ambassador' && !draft.selectedUniversity && !draft.creatingUniversity && draft.universityQuery.trim().length >= 3 && <button type="button" onClick={onCreate} className="mt-2 inline-flex items-center gap-2 text-sm font-black text-[#4285F4] hover:underline"><Building2 size={17} />Não encontrou? Criar “{draft.universityQuery.trim().toLowerCase()}”</button>}{draft.userType === 'student' && !draft.selectedUniversity && draft.universityQuery.trim().length >= 3 && <p className="mt-2 text-xs font-medium text-slate-500">Não encontrou? Peça a um embaixador para cadastrar a universidade.</p>}{draft.creatingUniversity && <p className="mt-2 rounded-lg bg-[#EBF3FE] p-3 text-xs font-bold">A universidade será criada em minúsculas e reutilizada caso já exista no banco.</p>}</div>;
-
-const AvatarDropzone = ({ avatar, avatarPreview, dragActive, setDragActive, fileInputRef, chooseAvatar, clearAvatar }: { avatar: File | null; avatarPreview: string; dragActive: boolean; setDragActive: (value: boolean) => void; fileInputRef: React.RefObject<HTMLInputElement | null>; chooseAvatar: (file?: File) => void; clearAvatar: () => void }) => <div><span className="mb-2 block text-sm font-black">Imagem de perfil <em className="font-medium text-slate-500">(opcional)</em></span><div onDragEnter={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); setDragActive(true); }} onDragOver={(event: DragEvent<HTMLDivElement>) => event.preventDefault()} onDragLeave={() => setDragActive(false)} onDrop={(event: DragEvent<HTMLDivElement>) => { event.preventDefault(); setDragActive(false); chooseAvatar(event.dataTransfer.files[0]); }} onClick={() => fileInputRef.current?.click()} className={`cursor-pointer rounded-xl border-2 border-dashed p-4 ${dragActive ? 'border-[#4285F4] bg-[#EBF3FE]' : 'border-slate-300 hover:border-[#4285F4]'}`}><input ref={fileInputRef} onChange={(event: ChangeEvent<HTMLInputElement>) => chooseAvatar(event.target.files?.[0])} accept="image/png,image/jpeg,image/webp" type="file" className="hidden" />{avatarPreview ? <div className="flex items-center gap-3"><img src={avatarPreview} alt="Prévia da imagem de perfil" className="w-12 h-12 rounded-full object-cover border-2 border-[#1e293b]" /><span className="text-sm font-bold truncate">{avatar?.name}</span><button type="button" onClick={(event) => { event.stopPropagation(); clearAvatar(); }} className="ml-auto p-1"><X size={18} /></button></div> : <div className="flex items-center gap-3 text-sm"><ImagePlus size={24} className="text-[#4285F4]" /><span><strong>Arraste uma imagem</strong> ou clique para enviar<br /><small className="text-slate-500">PNG, JPEG ou WebP · até 4 MB</small></span></div>}</div></div>;
+const UniversityPicker = ({ draft, universities, onInput, onSelect, onCreate, onClear }: { draft: RegistrationDraft; universities: University[]; onInput: (value: string) => void; onSelect: (university: University) => void; onCreate: () => void; onClear: () => void }) => <div className="relative"><span className="mb-2 block text-sm font-black">Universidade</span><span className="relative block"><Search size={18} className="input-icon absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input value={draft.universityQuery} onChange={(event) => onInput(event.target.value)} placeholder="Busque sua universidade" className="input-auth input-auth-leading-icon" /></span>{draft.selectedUniversity && <div className="mt-2 flex items-center justify-between rounded-lg bg-[#EFFBF3] px-3 py-2 text-sm font-bold"><span>{draft.selectedUniversity.name}</span><button type="button" onClick={onClear} aria-label="Remover universidade"><X size={16} /></button></div>}{universities.length > 0 && <div className="absolute z-20 mt-1 w-full rounded-xl border-2 border-[#1e293b] bg-white p-1 shadow-lg">{universities.map((university) => <button type="button" key={university.id} onClick={() => onSelect(university)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#EEF2FF]">{university.name}</button>)}</div>}{draft.userType === 'ambassador' && !draft.selectedUniversity && !draft.creatingUniversity && draft.universityQuery.trim().length >= 3 && <button type="button" onClick={onCreate} className="mt-2 inline-flex items-center gap-2 text-sm font-black text-[#4F46E5] hover:underline"><Building2 size={17} />Não encontrou? Criar “{draft.universityQuery.trim().toLowerCase()}”</button>}{draft.userType === 'student' && !draft.selectedUniversity && draft.universityQuery.trim().length >= 3 && <p className="mt-2 text-xs font-medium text-slate-500">Não encontrou? Peça a um embaixador para cadastrar a universidade.</p>}{draft.creatingUniversity && <p className="mt-2 rounded-lg bg-[#EEF2FF] p-3 text-xs font-bold">A universidade será criada em minúsculas e reutilizada caso já exista no banco.</p>}</div>;
 
 export default AuthPage;

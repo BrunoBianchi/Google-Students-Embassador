@@ -16,9 +16,9 @@ const HeroSection: React.FC = () => {
       {/* Floating 3D PNG Images from /public */}
       <div className="absolute top-28 left-[3%] sm:left-[6%] lg:left-[8%] float-slow z-20 hidden md:block">
         <div className="relative group cursor-pointer">
-          <img src="/smiley.png" alt="Smiley" className="w-20 lg:w-28 h-auto object-contain filter drop-shadow-[0_10px_20px_rgba(66,133,244,0.25)] group-hover:scale-110 transition-transform" />
+          <img src="/smiley.png" alt="Smiley" className="w-20 lg:w-28 h-auto object-contain filter drop-shadow-[0_10px_20px_rgba(79,70,229,0.25)] group-hover:scale-110 transition-transform" />
           <span className="absolute -bottom-2 -right-2 bg-[#FBBC04] text-[#1e293b] font-black text-[11px] px-2 py-0.5 rounded-md border-2 border-[#1e293b] -rotate-6 shadow-sm">
-            HEY GSA!
+            CAMPUS 2026
           </span>
         </div>
       </div>
@@ -26,7 +26,7 @@ const HeroSection: React.FC = () => {
       <div className="absolute top-24 right-[3%] sm:right-[6%] lg:right-[8%] float-medium z-20 hidden md:block">
         <div className="relative group cursor-pointer">
           <img src="/sparkle.png" alt="Sparkle" className="w-24 lg:w-36 h-auto object-contain filter drop-shadow-[0_10px_20px_rgba(251,188,4,0.3)] group-hover:rotate-12 transition-transform" />
-          <span className="absolute -bottom-2 -left-2 bg-[#4285F4] text-white font-black text-[11px] px-2 py-0.5 rounded-md border-2 border-[#1e293b] rotate-3 shadow-sm">
+          <span className="absolute -bottom-2 -left-2 bg-[#4F46E5] text-white font-black text-[11px] px-2 py-0.5 rounded-md border-2 border-[#1e293b] rotate-3 shadow-sm">
             CONECTE-SE
           </span>
         </div>
@@ -37,7 +37,7 @@ const HeroSection: React.FC = () => {
       </div>
 
       <div className="absolute bottom-36 right-[5%] float-slow z-20 hidden lg:block">
-        <img src="/chat.png" alt="Chat" className="w-20 lg:w-24 h-auto object-contain filter drop-shadow-[0_8px_16px_rgba(66,133,244,0.25)] hover:scale-110 transition-transform cursor-pointer" />
+        <img src="/chat.png" alt="Chat" className="w-20 lg:w-24 h-auto object-contain filter drop-shadow-[0_8px_16px_rgba(79,70,229,0.25)] hover:scale-110 transition-transform cursor-pointer" />
       </div>
 
       {/* Hero Central Content */}
@@ -46,7 +46,7 @@ const HeroSection: React.FC = () => {
         {/* Top Slanted Sticker Tag with sparkle.png */}
         <div className="inline-flex items-center gap-2 bg-[#FBBC04] text-[#1e293b] font-black text-xs sm:text-sm px-4 py-1.5 rounded-full border-3 border-[#1e293b] shadow-hard-black -rotate-1 mb-8 hover:rotate-1 transition-transform">
           <img src="/sparkle.png" alt="Sparkle" className="w-5 h-5 object-contain" />
-          <span>PLATAFORMA DA COMUNIDADE DOS EMBAIXADORES GOOGLE</span>
+          <span>PLATAFORMA INDEPENDENTE DA COMUNIDADE DE EMBAIXADORES</span>
           <span className="bg-[#1e293b] text-[#FBBC04] text-[10px] px-2 py-0.5 rounded-full font-black ml-1">
             2026 BR
           </span>
@@ -56,7 +56,7 @@ const HeroSection: React.FC = () => {
         <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-[4.75rem] font-black tracking-tight text-[#1e293b] leading-[1.1] mb-6">
           Todos os Embaixadores.<br />
           <span className="relative inline-block mt-2">
-            <span className="bg-[#4285F4] text-white px-4 py-1 rounded-2xl border-3 border-[#1e293b] shadow-hard-black -rotate-2 inline-block">
+            <span className="bg-[#4F46E5] text-white px-4 py-1 rounded-2xl border-3 border-[#1e293b] shadow-hard-black -rotate-2 inline-block">
               Uma só Plataforma.
             </span>
           </span>
@@ -65,14 +65,14 @@ const HeroSection: React.FC = () => {
         {/* Subtitle */}
         <p className="mt-4 text-base sm:text-xl text-[#475569] font-medium max-w-2xl mx-auto leading-relaxed">
           Chega de embaixadores isolados! Conecte-se com quem estuda no seu campus ou região, 
-          organize fóruns, compartilhe eventos e potencialize o impacto da comunidade Google no seu campus.
+          organize workshops, compartilhe eventos acadêmicos e potencialize o impacto da colaboração em IA na sua universidade.
         </p>
 
         {/* Action Buttons */}
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a 
             href="#recursos"
-            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-[#4285F4] hover:bg-[#3367d6] text-white font-extrabold text-base px-8 py-4 rounded-2xl border-3 border-[#1e293b] shadow-hard-black shadow-hard-hover transition-all"
+            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-extrabold text-base px-8 py-4 rounded-2xl border-3 border-[#1e293b] shadow-hard-black shadow-hard-hover transition-all"
           >
             <span>Explorar Recursos da Comunidade</span>
             <ArrowRight size={20} />
@@ -89,50 +89,45 @@ const HeroSection: React.FC = () => {
 
         {/* Quick Stats Pill Row */}
         <div className="mt-10 flex flex-wrap justify-center items-center gap-3">
-          <div className="bg-[#EBF3FE] text-[#4285F4] font-black text-xs px-3.5 py-1.5 rounded-xl border-2 border-[#1e293b] shadow-sm flex items-center gap-1.5">
-            <Users size={14} /> 500+ Embaixadores Ativos
+          <div className="bg-[#EEF2FF] text-[#4F46E5] font-black text-xs px-3.5 py-1.5 rounded-xl border-2 border-[#1e293b] shadow-sm flex items-center gap-1.5">
+            <Users size={14} /> 500+ Estudantes Conectados
           </div>
           <div className="bg-[#FEF0EF] text-[#EA4335] font-black text-xs px-3.5 py-1.5 rounded-xl border-2 border-[#1e293b] shadow-sm flex items-center gap-1.5">
-            <GraduationCap size={14} /> 120+ Universidades & Campus
+            <GraduationCap size={14} /> 120+ Universidades & Campi
           </div>
           <div className="bg-[#FFF8E7] text-[#D97706] font-black text-xs px-3.5 py-1.5 rounded-xl border-2 border-[#1e293b] shadow-sm flex items-center gap-1.5">
             <Calendar size={14} /> 250+ Eventos Registrados
           </div>
-          <div className="bg-[#EFFBF3] text-[#34A853] font-black text-xs px-3.5 py-1.5 rounded-xl border-2 border-[#1e293b] shadow-sm flex items-center gap-1.5">
-            <MessageSquare size={14} /> Fórum & Grupos Regionais
+          <div className="bg-[#EFFBF3] text-[#10B981] font-black text-xs px-3.5 py-1.5 rounded-xl border-2 border-[#1e293b] shadow-sm flex items-center gap-1.5">
+            <GraduationCap size={14} /> Workshops & Cursos de IA
           </div>
         </div>
 
         {/* Live Mock Showcase Window Frame */}
         <div className="mt-14 relative max-w-4xl mx-auto">
           
-          {/* Sticker badge floating on container */}
-          <div className="absolute -top-5 left-6 z-20 bg-[#EA4335] text-white font-black text-xs px-3.5 py-1 rounded-lg border-2 border-[#1e293b] -rotate-3 shadow-sm flex items-center gap-1.5">
-            <img src="/sparkle.png" alt="Sparkle" className="w-4 h-4 object-contain" />
-            <span>HUB EM TEMPO REAL</span>
-          </div>
-
           <div className="bg-white border-3 border-[#1e293b] rounded-3xl p-4 sm:p-6 shadow-hard-black text-left">
             
             {/* Top Bar of the Mock Window */}
             <div className="flex items-center justify-between pb-4 mb-4 border-b-2 border-gray-100">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#EA4335]" />
+                <span className="w-3 h-3 rounded-full bg-[#4F46E5]" />
                 <span className="w-3 h-3 rounded-full bg-[#FBBC04]" />
                 <span className="w-3 h-3 rounded-full bg-[#34A853]" />
-                <span className="text-xs font-bold text-gray-400 ml-2">gsa.studentsembassador.com</span>
+                <span className="text-xs font-black text-gray-400 ml-2">feed.universidades.app</span>
               </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-[#4285F4] bg-[#EBF3FE] px-2.5 py-1 rounded-full border border-[#4285F4]/20">
+              <span className="text-[11px] font-bold text-[#34A853] flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-[#34A853] animate-pulse" />
-                Rede de Embaixadores Online
-              </div>
+                Atualizações ao vivo
+              </span>
             </div>
+
 
             {/* Mock Content Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
               {/* Card 1: Student Ambassador Profile Mock */}
-              <div className="bg-[#f8fafc] p-4 rounded-2xl border-2 border-[#1e293b] hover:border-[#4285F4] transition-all">
+              <div className="bg-[#EEF2FF] p-4 rounded-2xl border-2 border-[#1e293b] hover:border-[#4F46E5] transition-all">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-full bg-[#4285F4] text-white font-black flex items-center justify-center border-2 border-[#1e293b]">
                     JS
@@ -169,21 +164,21 @@ const HeroSection: React.FC = () => {
                 </div>
               </div>
 
-              {/* Card 3: Regional Group Forum Mock */}
+              {/* Card 3: Course & Workshop Mock */}
               <div className="bg-[#EFFBF3] p-4 rounded-2xl border-2 border-[#1e293b] hover:border-[#34A853] transition-all">
                 <div className="flex items-center justify-between mb-2">
                   <span className="bg-[#34A853] text-white font-black text-[10px] px-2 py-0.5 rounded-md uppercase">
-                    Fórum Ativo
+                    Curso Gratuito
                   </span>
-                  <span className="text-[11px] font-bold text-gray-500">12 respostas</span>
+                  <span className="text-[11px] font-bold text-gray-500">6 módulos</span>
                 </div>
-                <h4 className="font-extrabold text-sm text-[#1e293b] mb-1">Como divulgar eventos sem verba?</h4>
+                <h4 className="font-extrabold text-sm text-[#1e293b] mb-1">Google Gemini Acadêmico</h4>
                 <p className="text-xs text-gray-600">
-                  Discussão aberta com estratégias de divulgação via centro acadêmico e redes.
+                  Aprenda prompts, embeddings e arquitetura de LLMs com rigor científico.
                 </p>
                 <div className="mt-3 flex items-center justify-between text-[11px] font-bold pt-2 border-t border-emerald-200">
-                  <span className="text-gray-500">Iniciado por Lucas M.</span>
-                  <span className="text-[#34A853] underline">Ver Tópico →</span>
+                  <span className="text-gray-500">Trilha Completa</span>
+                  <a href="/students" className="text-[#34A853] underline font-black">Acessar Curso →</a>
                 </div>
               </div>
 

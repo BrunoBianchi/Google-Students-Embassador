@@ -8,13 +8,15 @@ import { join } from "node:path";
 import { ensureUniversityIndex } from "./src/services/university.services";
 import { ensureUserIndexes } from "./src/services/user.services";
 import { ensureSessionIndexes } from "./src/services/session.services";
+import { ensureCampusIndexes, seedDefaultCampuses } from "./src/services/campus.services";
 import { allowCors, apiRateLimit, requireTrustedOrigin } from "./src/controllers/middleware/security.middleware";
+
 
 dotenv.config();
 
 export const app = express();
 const isProduction = process.env.NODE_ENV === "production";
-const canonicalFrontendOrigin = "https://google.studentembassador.com";
+const canonicalFrontendOrigin = "https://campus.studentembassador.com";
 const localFrontendOrigin = /^http:\/\/(?:[a-z0-9-]+\.)?localhost:3000$/i;
 const localApiHost = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i;
 const avatarPlaceholderPath = join(import.meta.dir, "src", "assets", "avatar-placeholder.svg");
@@ -103,6 +105,14 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
     return response.status(401).json({ error: "E-mail ou senha inválidos" });
   }
 
+  if (error instanceof Error && error.message === "Invalid group invite code") {
+    return response.status(400).json({ error: "O código de convite do grupo é inválido ou não está mais disponível" });
+  }
+
+  if (error instanceof Error && error.message === "Group invite code mismatch") {
+    return response.status(400).json({ error: "O código de convite não corresponde ao grupo selecionado" });
+  }
+
   if (error instanceof Error && error.message === "Cannot like own profile") {
     return response.status(400).json({ error: "Você não pode curtir o seu próprio perfil" });
   }
@@ -167,6 +177,14 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
     return response.status(400).json({ error: "Universidade não encontrada" });
   }
 
+  if (error instanceof Error && error.message === "Campus not found") {
+    return response.status(404).json({ error: "Campus não encontrado" });
+  }
+
+  if (error instanceof Error && error.message === "Campus authorization denied") {
+    return response.status(403).json({ error: "Você não tem permissão para administrar este campus" });
+  }
+
   if (error instanceof Error && (error.message.includes("Avatar deve ser") || error.message.includes("não é uma imagem válida"))) {
     return response.status(400).json({ error: error.message });
   }
@@ -182,15 +200,22 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 const port = Number(process.env.PORT) || 3001;
 const host = process.env.HOST ?? (isProduction ? "127.0.0.1" : "0.0.0.0");
 
+import { ensureAnnouncementIndexes, seedDefaultAnnouncements } from "./src/services/announcement.services";
+
 AppDataSource.initialize()
   .then(async () => {
     await ensureUniversityIndex();
     await ensureUserIndexes();
     await ensureSessionIndexes();
+    await ensureCampusIndexes();
+    await seedDefaultCampuses();
+    await ensureAnnouncementIndexes();
+    await seedDefaultAnnouncements();
     app.listen(port, host, () => {
       console.log(`API conectada ao MongoDB e escutando em ${host}:${port}`);
     });
   })
+
   .catch((error: unknown) => {
     console.error("Não foi possível conectar ao MongoDB.", error);
     process.exit(1);

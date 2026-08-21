@@ -1,64 +1,160 @@
-import { Router, type NextFunction, type Request, type Response } from "express";
-import { eventNewsSchema, eventOrganizerSchema, eventSchema, eventUpdateSchema } from "../../database/schemas/community.schema";
-import { addEventNews, addEventOrganizer, addEventOrganizerGroup, createEvent, createEventForum, deleteEvent, getEventDetails, listEventDirectory, listEvents, removeEventOrganizer, setEventParticipation, updateEvent } from "../../services/community.services";
-import { getAuthenticatedUserId, requireAuth, requireRole, type AuthenticatedRequest } from "../middleware/auth.middleware";
+import { Router, type Request, type Response } from "express";
+import { getAuthenticatedUserId, requireAuth, type AuthenticatedRequest } from "../middleware/auth.middleware";
+import {
+  listGlobalEvents,
+  getEvent,
+  createEvent,
+  updateEvent,
+  cancelEvent,
+  participateInEvent,
+  cancelParticipation,
+} from "../../services/community.services";
+import { eventSchema, eventUpdateSchema } from "../../database/schemas/community.schema";
 
 const eventsController = Router();
 
-eventsController.get("/", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.json({ events: await listEvents(request.userId!) }); } catch (error) { return next(error); }
+// GET /events/global (upcoming, past, calendar, all)
+eventsController.get("/global", async (req: Request, res: Response) => {
+  const viewerId = await getAuthenticatedUserId(req);
+  const { timeframe, tag, search, page, limit } = req.query;
+
+  const result = await listGlobalEvents(
+    {
+      timeframe: (timeframe === "upcoming" || timeframe === "past" || timeframe === "month" || timeframe === "all")
+        ? timeframe
+        : "upcoming",
+      tag: typeof tag === "string" ? tag : undefined,
+      search: typeof search === "string" ? search : undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+    },
+    viewerId,
+  );
+
+  return res.json(result);
 });
 
-eventsController.post("/", requireAuth, requireRole("ambassador"), async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.status(201).json({ event: await createEvent(eventSchema.parse(request.body), request.userId!) }); } catch (error) { return next(error); }
-});
-
-eventsController.get("/discover", async (request: Request, response: Response, next: NextFunction) => {
-  try { return response.json({ events: await listEventDirectory(await getAuthenticatedUserId(request)) }); } catch (error) { return next(error); }
-});
-
-eventsController.get("/:eventId", async (request: Request, response: Response, next: NextFunction) => {
+// GET /events/global/:eventId
+eventsController.get("/global/:eventId", async (req: Request, res: Response) => {
+  const viewerId = await getAuthenticatedUserId(req);
+  const eventId = String(req.params.eventId);
   try {
-    const event = await getEventDetails(String(request.params.eventId), await getAuthenticatedUserId(request));
-    if (!event) return response.status(404).json({ error: "Evento não encontrado" });
-    return response.json(event);
-  } catch (error) { return next(error); }
+    const event = await getEvent(eventId, viewerId);
+    return res.json({ event });
+  } catch (err: any) {
+    if (err?.message === "Resource not found") {
+      return res.status(404).json({ error: "Evento não encontrado." });
+    }
+    return res.status(500).json({ error: "Erro ao buscar evento." });
+  }
 });
 
-eventsController.post("/:eventId/participation", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.json({ event: await setEventParticipation(String(request.params.eventId), request.userId!, true) }); } catch (error) { return next(error); }
+// POST /events (Create Event - Global or Campus)
+eventsController.post("/", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.userId) {
+    return res.status(401).json({ error: "Sessão inválida" });
+  }
+
+  const parsed = eventSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Dados do evento inválidos", details: parsed.error.issues });
+  }
+
+  try {
+    const event = await createEvent(parsed.data, req.userId);
+    return res.status(201).json({ message: "Evento criado com sucesso.", event });
+  } catch (err: any) {
+    if (err?.message === "Event management denied") {
+      return res.status(403).json({ error: "Você não tem permissão para criar eventos neste campus." });
+    }
+    return res.status(400).json({ error: err?.message ?? "Não foi possível criar o evento." });
+  }
 });
 
-eventsController.delete("/:eventId/participation", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.json({ event: await setEventParticipation(String(request.params.eventId), request.userId!, false) }); } catch (error) { return next(error); }
+// GET /events/:eventId
+eventsController.get("/:eventId", async (req: Request, res: Response) => {
+  const viewerId = await getAuthenticatedUserId(req);
+  const eventId = String(req.params.eventId);
+  try {
+    const event = await getEvent(eventId, viewerId);
+    return res.json({ event });
+  } catch (err: any) {
+    if (err?.message === "Resource not found") {
+      return res.status(404).json({ error: "Evento não encontrado." });
+    }
+    return res.status(500).json({ error: "Erro ao buscar evento." });
+  }
 });
 
-eventsController.delete("/:eventId", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { await deleteEvent(String(request.params.eventId), request.userId!); return response.status(204).send(); } catch (error) { return next(error); }
+// PATCH /events/:eventId
+eventsController.patch("/:eventId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.userId) {
+    return res.status(401).json({ error: "Sessão inválida" });
+  }
+
+  const parsed = eventUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Dados inválidos", details: parsed.error.issues });
+  }
+
+  const eventId = String(req.params.eventId);
+  try {
+    const event = await updateEvent(eventId, req.userId, parsed.data);
+    return res.json({ message: "Evento atualizado com sucesso.", event });
+  } catch (err: any) {
+    if (err?.message === "Event management denied") {
+      return res.status(403).json({ error: "Você não tem permissão para editar este evento." });
+    }
+    return res.status(400).json({ error: err?.message ?? "Não foi possível atualizar o evento." });
+  }
 });
 
-eventsController.patch("/:eventId", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.json({ event: await updateEvent(String(request.params.eventId), eventUpdateSchema.parse(request.body), request.userId!) }); } catch (error) { return next(error); }
+// DELETE /events/:eventId
+eventsController.delete("/:eventId", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.userId) {
+    return res.status(401).json({ error: "Sessão inválida" });
+  }
+
+  const eventId = String(req.params.eventId);
+  try {
+    await cancelEvent(eventId, req.userId);
+    return res.json({ message: "Evento cancelado com sucesso." });
+  } catch (err: any) {
+    if (err?.message === "Event management denied") {
+      return res.status(403).json({ error: "Você não tem permissão para cancelar este evento." });
+    }
+    return res.status(400).json({ error: err?.message ?? "Não foi possível cancelar o evento." });
+  }
 });
 
-eventsController.post("/:eventId/organizers", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.json({ event: await addEventOrganizer(String(request.params.eventId), eventOrganizerSchema.parse(request.body).userId, request.userId!) }); } catch (error) { return next(error); }
+// POST /events/:eventId/participate
+eventsController.post("/:eventId/participate", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.userId) {
+    return res.status(401).json({ error: "Sessão inválida" });
+  }
+
+  const eventId = String(req.params.eventId);
+  try {
+    const event = await participateInEvent(eventId, req.userId);
+    return res.json({ message: "Inscrição confirmada!", event });
+  } catch (err: any) {
+    return res.status(400).json({ error: err?.message ?? "Não foi possível se inscrever no evento." });
+  }
 });
 
-eventsController.post("/:eventId/organizer-groups", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.json({ event: await addEventOrganizerGroup(String(request.params.eventId), eventOrganizerSchema.parse(request.body).userId, request.userId!) }); } catch (error) { return next(error); }
-});
+// DELETE /events/:eventId/participate
+eventsController.delete("/:eventId/participate", requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.userId) {
+    return res.status(401).json({ error: "Sessão inválida" });
+  }
 
-eventsController.delete("/:eventId/organizers/:userId", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.json({ event: await removeEventOrganizer(String(request.params.eventId), String(request.params.userId), request.userId!) }); } catch (error) { return next(error); }
-});
-
-eventsController.post("/:eventId/news", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.status(201).json({ event: await addEventNews(String(request.params.eventId), eventNewsSchema.parse(request.body).content, request.userId!) }); } catch (error) { return next(error); }
-});
-
-eventsController.post("/:eventId/forum", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
-  try { return response.status(201).json({ event: await createEventForum(String(request.params.eventId), request.userId!) }); } catch (error) { return next(error); }
+  const eventId = String(req.params.eventId);
+  try {
+    const event = await cancelParticipation(eventId, req.userId);
+    return res.json({ message: "Inscrição cancelada com sucesso.", event });
+  } catch (err: any) {
+    return res.status(400).json({ error: err?.message ?? "Não foi possível cancelar a inscrição." });
+  }
 });
 
 export default eventsController;

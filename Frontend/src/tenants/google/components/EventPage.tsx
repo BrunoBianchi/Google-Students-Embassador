@@ -14,6 +14,23 @@ import { updateSeo } from '../../../seo';
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full' });
 const timeFormatter = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const newsDateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' });
+
+const safeFormatDate = (
+  value: string | number | Date | null | undefined,
+  formatter: Intl.DateTimeFormat,
+  fallback: string = 'Data a confirmar'
+): string => {
+  if (!value) return fallback;
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return fallback;
+    return formatter.format(d);
+  } catch {
+    return fallback;
+  }
+};
+
 type EventTab = 'about' | 'updates' | 'people';
 
 const EventPage = ({ eventId }: { eventId: string }) => {
@@ -42,7 +59,30 @@ const EventPage = ({ eventId }: { eventId: string }) => {
   useEffect(() => {
     if (!data) return;
     const { event } = data;
-    updateSeo({ title: `${event.title} | Eventos GSA Hub`, description: event.description.slice(0, 160), canonical: `${window.location.origin}/events/${event.id}`, image: event.imageUrls[0], type: 'article', jsonLd: { '@context': 'https://schema.org', '@type': 'Event', name: event.title, description: event.description, startDate: event.startsAt, endDate: event.endsAt, eventStatus: 'https://schema.org/EventScheduled', location: event.coordinates ? { '@type': 'Place', name: event.location, address: { '@type': 'PostalAddress', addressLocality: event.city, addressRegion: event.state, addressCountry: 'BR' }, geo: { '@type': 'GeoCoordinates', latitude: event.coordinates.lat, longitude: event.coordinates.lng } } : { '@type': 'VirtualLocation', url: window.location.href }, url: window.location.href } });
+    const firstImg = Array.isArray(event.imageUrls) ? event.imageUrls[0] : undefined;
+    updateSeo({
+      title: `${event.title} | Eventos GSA Hub`,
+      description: (event.description || '').slice(0, 160),
+      canonical: `${window.location.origin}/events/${event.id}`,
+      image: firstImg || `${window.location.origin}/logo.png`,
+      type: 'article',
+      jsonLd: {
+        '@context': 'https://schema.org',
+        '@type': 'Event',
+        name: event.title,
+        description: event.description,
+        startDate: event.startsAt,
+        endDate: event.endsAt,
+        eventStatus: 'https://schema.org/EventScheduled',
+        location: event.coordinates ? {
+          '@type': 'Place',
+          name: event.location,
+          address: { '@type': 'PostalAddress', addressLocality: event.city, addressRegion: event.state, addressCountry: 'BR' },
+          geo: { '@type': 'GeoCoordinates', latitude: event.coordinates.lat, longitude: event.coordinates.lng }
+        } : { '@type': 'VirtualLocation', url: window.location.href },
+        url: window.location.href
+      }
+    });
   }, [data]);
 
   const toggleParticipation = async () => {
@@ -72,10 +112,16 @@ const EventPage = ({ eventId }: { eventId: string }) => {
   if (isLoading || isSessionLoading) return <Loading />;
   if (!data) return <NotFound message={error || 'Esse evento não está mais disponível.'} />;
 
-  const { event, organizer, organizers, participants, ambassadorParticipants, news } = data;
+  const { event, organizer, organizers, participants = [], ambassadorParticipants = [], news = [] } = data;
   const isFull = event.availableSpots === 0 && !event.isParticipating;
-  const coverImage = event.imageUrls[imageIndex];
+  const imageUrls = Array.isArray(event.imageUrls) ? event.imageUrls : [];
+  const coverImage = imageUrls[imageIndex];
   const capacityLabel = event.capacity ? `${event.availableSpots ?? 0} de ${event.capacity} vagas disponíveis` : 'Vagas sem limite definido';
+
+  const formattedDate = safeFormatDate(event.startsAt, dateFormatter);
+  const formattedStartTime = safeFormatDate(event.startsAt, timeFormatter, 'Horário a definir');
+  const formattedEndTime = event.endsAt ? safeFormatDate(event.endsAt, timeFormatter, '') : '';
+  const formattedSchedule = formattedEndTime ? `${formattedStartTime} — ${formattedEndTime}` : formattedStartTime;
 
   return <div className="min-h-screen bg-[#F8FAFE] text-[#1e293b]">
     <Navbar />
@@ -88,9 +134,9 @@ const EventPage = ({ eventId }: { eventId: string }) => {
           <div className="relative min-h-[280px] bg-[#1e293b]">
             {coverImage ? <img src={coverImage} alt={`Imagem do evento ${event.title}`} className="absolute inset-0 h-full w-full object-cover" /> : <div className="absolute inset-0 overflow-hidden bg-[#1e293b]"><div className="absolute -left-10 -top-14 h-56 w-56 rounded-full border-[22px] border-[#4285F4]/50" /><div className="absolute -bottom-16 right-6 h-52 w-52 rounded-full border-[22px] border-[#34A853]/45" /><div className="absolute right-10 top-10 h-20 w-20 rotate-12 rounded-2xl bg-[#FBBC04]" /><CalendarDays className="absolute left-10 top-1/2 -translate-y-1/2 text-white" size={72} /></div>}
             <span className="absolute left-5 top-5 rounded-full bg-white px-3 py-1.5 text-xs font-black text-[#1e293b]">EVENTO DA COMUNIDADE</span>
-            {event.imageUrls.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex gap-2 overflow-x-auto rounded-xl bg-[#1e293b]/70 p-2 backdrop-blur-sm">{event.imageUrls.map((url, index) => <button key={url} type="button" onClick={() => setImageIndex(index)} aria-label={`Ver imagem ${index + 1}`} className={`h-12 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${imageIndex === index ? 'border-[#FBBC04]' : 'border-white/70'}`}><img src={url} alt="" className="h-full w-full object-cover" /></button>)}</div>}
+            {imageUrls.length > 1 && <div className="absolute bottom-4 left-4 right-4 flex gap-2 overflow-x-auto rounded-xl bg-[#1e293b]/70 p-2 backdrop-blur-sm">{imageUrls.map((url, index) => <button key={url} type="button" onClick={() => setImageIndex(index)} aria-label={`Ver imagem ${index + 1}`} className={`h-12 w-16 shrink-0 overflow-hidden rounded-lg border-2 ${imageIndex === index ? 'border-[#FBBC04]' : 'border-white/70'}`}><img src={url} alt="" className="h-full w-full object-cover" /></button>)}</div>}
           </div>
-          <div className="flex flex-col justify-between p-6 sm:p-8"><div><span className="inline-flex items-center gap-2 rounded-full bg-[#EBF3FE] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#4285F4]"><CalendarDays size={15} />{dateFormatter.format(new Date(event.startsAt))}</span><EventTags tags={event.tags} className="mt-3" /><h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">{event.title}</h1><p className="mt-4 text-sm font-medium leading-relaxed text-slate-600">{event.description}</p></div><div className="mt-7 flex flex-wrap gap-3"><button type="button" onClick={() => void copyLink()} className="button-secondary !min-h-10 !px-3"><Share2 size={16} />{copied ? 'Link copiado' : 'Compartilhar'}</button>{event.isOrganizer && <a href="/dashboard" className="button-secondary !min-h-10 !px-3 text-xs">Gerenciar no Dashboard</a>}</div></div>
+          <div className="flex flex-col justify-between p-6 sm:p-8"><div><span className="inline-flex items-center gap-2 rounded-full bg-[#EBF3FE] px-3 py-1.5 text-xs font-black uppercase tracking-wide text-[#4285F4]"><CalendarDays size={15} />{formattedDate}</span><EventTags tags={event.tags || []} className="mt-3" /><h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">{event.title}</h1><p className="mt-4 text-sm font-medium leading-relaxed text-slate-600">{event.description}</p></div><div className="mt-7 flex flex-wrap gap-3"><button type="button" onClick={() => void copyLink()} className="button-secondary !min-h-10 !px-3"><Share2 size={16} />{copied ? 'Link copiado' : 'Compartilhar'}</button>{event.isOrganizer && <a href="/dashboard" className="button-secondary !min-h-10 !px-3 text-xs">Gerenciar no Dashboard</a>}</div></div>
         </div>
       </section>
 
@@ -101,11 +147,11 @@ const EventPage = ({ eventId }: { eventId: string }) => {
       </nav>
 
       {activeTab === 'about' && <div className="mt-5 grid gap-7 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black sm:p-7"><h2 className="text-2xl font-black">Sobre o evento</h2><p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700 sm:text-base">{event.description}</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} label="Data" value={dateFormatter.format(new Date(event.startsAt))} tone="blue" /><Info icon={Clock3} label="Horário" value={`${timeFormatter.format(new Date(event.startsAt))}${event.endsAt ? ` — ${timeFormatter.format(new Date(event.endsAt))}` : ''}`} tone="yellow" /><Info icon={MapPin} label="Local" value={event.location} tone="red" /><Info icon={UsersRound} label="Inscrições" value={capacityLabel} tone="green" /></div>{event.coordinates && <div className="mt-6"><h3 className="mb-3 text-lg font-black">Como chegar</h3><EventLocationPicker coordinates={event.coordinates} interactive={false} /></div>}</section>
-        <aside className="space-y-5 xl:sticky xl:top-28 xl:self-start"><ParticipationCard event={event} capacityLabel={capacityLabel} isFull={isFull} isUpdating={isUpdating} user={user} onToggle={() => void toggleParticipation()} /><section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black"><span className="text-xs font-black uppercase tracking-widest text-[#4285F4]">Organização</span>{organizer ? <a href={`/u/${organizer.id}`} className="mt-4 flex items-center gap-3 rounded-2xl bg-[#F8FAFE] p-3 hover:bg-[#EBF3FE]"><Avatar participant={organizer} /><div className="min-w-0"><p className="truncate text-sm font-black">{organizer.nickname ?? organizer.name}</p><p className="mt-1 flex items-center gap-1 text-xs font-bold text-slate-600"><GraduationCap size={14} className="text-[#4285F4]" />{organizer.universityName}</p></div></a> : <p className="mt-4 text-sm text-slate-600">Organização do GSA Brasil Hub.</p>}<p className="mt-4 rounded-xl bg-[#FFF8E7] p-3 text-xs font-medium leading-relaxed text-slate-700">Confira local e horário antes de sair. Se algo mudar, as informações desta página serão atualizadas.</p></section>{event.forumId && <section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black"><div className="flex items-center gap-2"><MessageSquareText className="text-[#4285F4]" size={19} /><div><h2 className="font-black">Fórum da organização</h2><p className="text-xs text-slate-600">Canal privado da equipe do evento.</p></div></div><a href={`/forums/${event.forumId}`} className="button-primary mt-4 w-full"><MessageSquareText size={16} />Abrir fórum privado</a></section>}{event.imageUrls.length > 0 && <section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black"><div className="flex items-center gap-2"><ImageIcon className="text-[#EA4335]" size={19} /><h2 className="font-black">Galeria</h2></div><div className="mt-4 grid grid-cols-3 gap-2">{event.imageUrls.map((url, index) => <button key={url} onClick={() => setImageIndex(index)} className="aspect-square overflow-hidden rounded-xl border-2 border-slate-200 hover:border-[#4285F4]"><img src={url} alt={`Imagem ${index + 1} do evento`} className="h-full w-full object-cover" /></button>)}</div></section>}</aside>
+        <section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black sm:p-7"><h2 className="text-2xl font-black">Sobre o evento</h2><p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-700 sm:text-base">{event.description}</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><Info icon={CalendarDays} label="Data" value={formattedDate} tone="blue" /><Info icon={Clock3} label="Horário" value={formattedSchedule} tone="yellow" /><Info icon={MapPin} label="Local" value={event.location} tone="red" /><Info icon={UsersRound} label="Inscrições" value={capacityLabel} tone="green" /></div>{event.coordinates && <div className="mt-6"><h3 className="mb-3 text-lg font-black">Como chegar</h3><EventLocationPicker coordinates={event.coordinates} interactive={false} /></div>}</section>
+        <aside className="space-y-5 xl:sticky xl:top-28 xl:self-start"><ParticipationCard event={event} capacityLabel={capacityLabel} isFull={isFull} isUpdating={isUpdating} user={user} onToggle={() => void toggleParticipation()} /><section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black"><span className="text-xs font-black uppercase tracking-widest text-[#4285F4]">Organização</span>{organizer ? <a href={`/u/${organizer.id}`} className="mt-4 flex items-center gap-3 rounded-2xl bg-[#F8FAFE] p-3 hover:bg-[#EBF3FE]"><Avatar participant={organizer} /><div className="min-w-0"><p className="truncate text-sm font-black">{organizer.nickname ?? organizer.name}</p><p className="mt-1 flex items-center gap-1 text-xs font-bold text-slate-600"><GraduationCap size={14} className="text-[#4285F4]" />{organizer.universityName}</p></div></a> : <p className="mt-4 text-sm text-slate-600">Organização do GSA Brasil Hub.</p>}<p className="mt-4 rounded-xl bg-[#FFF8E7] p-3 text-xs font-medium leading-relaxed text-slate-700">Confira local e horário antes de sair. Se algo mudar, as informações desta página serão atualizadas.</p></section>{imageUrls.length > 0 && <section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black"><div className="flex items-center gap-2"><ImageIcon className="text-[#EA4335]" size={19} /><h2 className="font-black">Galeria</h2></div><div className="mt-4 grid grid-cols-3 gap-2">{imageUrls.map((url, index) => <button key={url} onClick={() => setImageIndex(index)} className="aspect-square overflow-hidden rounded-xl border-2 border-slate-200 hover:border-[#4285F4]"><img src={url} alt={`Imagem ${index + 1} do evento`} className="h-full w-full object-cover" /></button>)}</div></section>}</aside>
       </div>}
 
-      {activeTab === 'updates' && <section className="mt-5 rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black sm:p-7"><div className="flex items-end justify-between gap-3"><div><span className="text-xs font-black uppercase tracking-widest text-[#EA4335]">Atualizações</span><h2 className="mt-2 text-2xl font-black">Notícias do evento</h2><p className="mt-2 text-sm text-slate-600">Acompanhe os comunicados publicados pela organização.</p></div><Newspaper className="text-[#EA4335]" size={23} /></div>{news.length ? <div className="mt-6 space-y-3">{news.slice().reverse().map((item) => <article key={item.id} className="rounded-2xl border-2 border-slate-200 p-4 sm:p-5"><p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{item.content}</p><p className="mt-3 text-xs font-bold text-slate-500">{item.author?.nickname ?? item.author?.name ?? 'Equipe de organização'} · {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(item.createdAt))}</p></article>)}</div> : <Empty icon={Newspaper} text="Ainda não há notícias publicadas." />}</section>}
+      {activeTab === 'updates' && <section className="mt-5 rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black sm:p-7"><div className="flex items-end justify-between gap-3"><div><span className="text-xs font-black uppercase tracking-widest text-[#EA4335]">Atualizações</span><h2 className="mt-2 text-2xl font-black">Notícias do evento</h2><p className="mt-2 text-sm text-slate-600">Acompanhe os comunicados publicados pela organização.</p></div><Newspaper className="text-[#EA4335]" size={23} /></div>{news.length ? <div className="mt-6 space-y-3">{news.slice().reverse().map((item) => <article key={item.id} className="rounded-2xl border-2 border-slate-200 p-4 sm:p-5"><p className="whitespace-pre-line text-sm leading-relaxed text-slate-700">{item.content}</p><p className="mt-3 text-xs font-bold text-slate-500">{item.author?.nickname ?? item.author?.name ?? 'Equipe de organização'} · {safeFormatDate(item.createdAt, newsDateFormatter)}</p></article>)}</div> : <Empty icon={Newspaper} text="Ainda não há notícias publicadas." />}</section>}
 
       {activeTab === 'people' && <div className="mt-5 grid gap-7 xl:grid-cols-[minmax(0,1fr)_360px]"><div className="space-y-7"><section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black sm:p-7"><div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><span className="text-xs font-black uppercase tracking-widest text-[#34A853]">Equipe do evento</span><h2 className="mt-2 text-2xl font-black">Embaixadores da organização</h2><p className="mt-1 text-sm text-slate-600">Pessoas convidadas para organizar essa experiência.</p></div><span className="rounded-full bg-[#EFFBF3] px-3 py-1 text-xs font-black text-[#18753A]">{ambassadorParticipants.length} embaixador{ambassadorParticipants.length === 1 ? '' : 'es'}</span></div>{ambassadorParticipants.length ? <div className="mt-5 grid gap-3 sm:grid-cols-2">{ambassadorParticipants.map((participant) => <ParticipantCard key={participant.id} participant={participant} ambassador />)}</div> : <Empty icon={GraduationCap} text="A equipe organizadora aparecerá aqui." />}</section><section className="rounded-3xl border-3 border-[#1e293b] bg-white p-5 shadow-hard-black sm:p-7"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-black">Pessoas confirmadas</h2><p className="mt-1 text-sm text-slate-600">{event.participantCount} pessoa{event.participantCount === 1 ? '' : 's'} na lista de presença.</p></div><span className="rounded-full bg-[#EBF3FE] px-3 py-1 text-xs font-black text-[#4285F4]">Comunidade aberta</span></div>{participants.length ? <div className="mt-5 grid gap-3 sm:grid-cols-2">{participants.map((participant) => <ParticipantCard key={participant.id} participant={participant} />)}</div> : <Empty icon={UsersRound} text="Seja a primeira pessoa a confirmar presença." />}</section></div><aside className="xl:sticky xl:top-28 xl:self-start"><ParticipationCard event={event} capacityLabel={capacityLabel} isFull={isFull} isUpdating={isUpdating} user={user} onToggle={() => void toggleParticipation()} /></aside></div>}
     </main>

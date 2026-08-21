@@ -5,6 +5,15 @@ export type UserType = "ambassador" | "student";
 export type AvatarFrame = "none" | "google" | "gold" | "rainbow" | "campus" | "gemini" | "orbit" | "pixel" | "network" | "constellation" | "chrome" | "android" | "cloud" | "firebase" | "maps" | "codejam" | "community" | "prism" | "devfest" | "studio" | "spark" | "material" | "heart" | "applause" | "comet" | "aura" | "mosaic";
 export type EmailPreferences = { eventUpdates: boolean; forumUpdates: boolean; productUpdates: boolean };
 
+export type AmbassadorPrivacySettings = {
+  isPublic?: boolean;
+  showCampus?: boolean;
+  showRegion?: boolean;
+  showCourse?: boolean;
+  showBio?: boolean;
+  showSocialLinks?: boolean;
+};
+
 @Entity({ name: "users" })
 export class User {
   @ObjectIdColumn()
@@ -29,6 +38,9 @@ export class User {
   @Column({ nullable: true })
   nickname?: string;
 
+  @Column({ nullable: true })
+  course?: string;
+
   @Column()
   birth!: Date;
 
@@ -38,6 +50,9 @@ export class User {
   @Column()
   city!: string;
 
+  @Column({ nullable: true })
+  region?: string;
+
   @Column()
   userType!: UserType;
 
@@ -46,6 +61,12 @@ export class User {
 
   @Column({ nullable: true })
   groupCode?: string;
+
+  // The public code is unique per ambassador, while the number lets us
+  // aggregate the ten national ambassador groups without exposing a member's
+  // personal code in the map or directory.
+  @Column({ nullable: true })
+  groupNumber?: number;
 
   @Column({ nullable: true })
   avatarPath?: string;
@@ -65,8 +86,12 @@ export class User {
   @Column({ nullable: true })
   phone?: string;
 
+  @Column({ nullable: true })
+  privacySettings?: AmbassadorPrivacySettings;
+
   @Column()
   avatarFrame: AvatarFrame = "none";
+
 
   @Column({ nullable: true })
   inviteCode?: string;

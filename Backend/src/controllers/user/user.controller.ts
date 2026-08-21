@@ -15,7 +15,10 @@ import { sendPasswordResetEmail, sendVerificationEmail } from "../../services/ma
 import { getDashboard } from "../../services/community.services";
 import { getPublicProfile } from "../../services/community.services";
 import { ensureUserInviteCode } from "../../services/user.services";
+import { getUserCampuses } from "../../services/campus.services";
 import type { User } from "../../database/models/user.model";
+import { groupNumberForInviteCode } from "../../config/ambassador-group-codes";
+
 
 const userController = Router();
 const sessionDurationMs = 7 * 24 * 60 * 60 * 1000;
@@ -25,6 +28,14 @@ const emailSchema = z.object({ email: z.string().trim().toLowerCase().email().ma
 const tokenSchema = z.object({ token: z.string().min(32).max(256) });
 const passwordResetSchema = tokenSchema.extend({ password: z.string().min(8).max(128) });
 const unsubscribeSchema = tokenSchema.extend({ category: z.enum(["eventUpdates", "forumUpdates", "productUpdates"]) });
+
+userController.get("/group-invitations/:code", authRateLimit, (request: Request, response: Response) => {
+  const code = String(request.params.code ?? "").trim().toUpperCase();
+  const groupNumber = groupNumberForInviteCode(code);
+  return groupNumber
+    ? response.json({ valid: true, code, groupNumber })
+    : response.status(404).json({ valid: false, error: "Código de grupo inválido" });
+});
 
 await mkdir(avatarDirectory, { recursive: true });
 
@@ -42,13 +53,17 @@ const upload = multer({
   },
 });
 
+const cookieDomain = process.env.COOKIE_DOMAIN || (isProduction ? ".studentembassador.com" : undefined);
+
 const sessionCookieOptions = {
   httpOnly: true,
   secure: isProduction,
   sameSite: "lax" as const,
   maxAge: sessionDurationMs,
   path: "/",
+  ...(cookieDomain ? { domain: cookieDomain } : {}),
 };
+
 
 const hasValidImageSignature = async (path: string) => {
   const header = await readFile(path);
@@ -73,6 +88,8 @@ const publicUser = (user: User) => ({
   instagramUrl: user.instagramUrl,
   phone: user.phone,
   avatarFrame: user.avatarFrame ?? "none",
+  groupCode: user.groupCode,
+  groupNumber: user.groupNumber,
 });
 
 const startSession = async (user: User, response: Response, status: number) => {
@@ -202,6 +219,16 @@ userController.get("/me", requireAuth, async (request: AuthenticatedRequest, res
     return next(error);
   }
 });
+
+userController.get("/me/campuses", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
+  try {
+    const campuses = await getUserCampuses(request.userId!);
+    return response.json({ campuses });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 
 userController.get("/dashboard", requireAuth, async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
   try {

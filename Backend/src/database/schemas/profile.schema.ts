@@ -13,6 +13,10 @@ export const profileSchema = z.object({
   instagramUrl: optionalUrl.optional(),
   phone: z.string().trim().regex(/^[+0-9 ()-]{8,24}$/).optional().or(z.literal("")).transform((value) => value || undefined),
   avatarFrame: z.enum(["none", "google", "gold", "rainbow", "campus", "gemini", "orbit", "pixel", "network", "constellation", "chrome", "android", "cloud", "firebase", "maps", "codejam", "community", "prism", "devfest", "studio", "spark", "material", "heart", "applause", "comet", "aura", "mosaic"]),
+  groupNumber: z.preprocess(
+    (value) => value === "" || value === undefined ? undefined : Number(value),
+    z.number().int().min(1).max(10).optional(),
+  ),
 });
 
 export type ProfileInput = z.infer<typeof profileSchema>;

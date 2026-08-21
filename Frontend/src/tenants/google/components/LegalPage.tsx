@@ -1,51 +1,298 @@
-import { ArrowLeft, FileText, ShieldCheck } from "lucide-react";
+import React, { useState } from "react";
+import { ArrowLeft, FileText, ShieldCheck, ExternalLink, AlertCircle, CheckCircle2, Lock, Scale, HelpCircle } from "lucide-react";
+import Logo from "./Logo";
 
-type LegalPageProps = { kind: "terms" | "privacy" };
+type LegalPageProps = { kind?: "terms" | "privacy" };
 
-const content = {
-  terms: {
-    eyebrow: "GSA Brasil Hub · legal",
-    title: "Termos de Uso",
-    description: "Regras claras para que a comunidade seja útil, respeitosa e segura para todos.",
-    icon: FileText,
-    sections: [
-      ["1. Aceitação", "Ao criar uma conta ou usar o Google Student Ambassador Hub, você concorda com estes Termos de Uso e com a Política de Privacidade. O Hub é um projeto acadêmico independente e não possui vínculo, patrocínio ou endosso da Google LLC."],
-      ["2. Conta e segurança", "Você deve fornecer informações verdadeiras, manter sua senha em sigilo e confirmar seu e-mail. A conta é pessoal; não compartilhe credenciais nem use dados de outra pessoa."],
-      ["3. Convivência", "Use eventos, fóruns e grupos de forma respeitosa. Não publique conteúdo ilegal, discriminatório, ofensivo, spam, dados pessoais de terceiros ou material que viole direitos autorais. Administradores e moderadores podem remover conteúdo e limitar acessos para proteger a comunidade."],
-      ["4. Conteúdo e participação", "Você continua responsável pelo que publica. Ao compartilhar conteúdo no Hub, concede uma licença não exclusiva para exibi-lo dentro da plataforma, exclusivamente para operar e divulgar a comunidade conforme suas configurações de privacidade."],
-      ["5. Eventos e organizações", "Organizadores são responsáveis pela precisão das informações dos eventos e pelo cumprimento das leis aplicáveis. A presença em um evento não cria vínculo com universidades, empresas ou a Google LLC."],
-      ["6. Alterações e contato", "Podemos atualizar estes termos para melhorar segurança, funcionamento ou adequação legal. Mudanças relevantes serão comunicadas no Hub ou por e-mail a quem autorizou comunicações. Dúvidas podem ser encaminhadas pelos canais oficiais do projeto."],
-    ],
-  },
-  privacy: {
-    eyebrow: "GSA Brasil Hub · privacidade",
-    title: "Política de Privacidade",
-    description: "Transparência sobre os dados necessários para conectar sua comunidade universitária.",
-    icon: ShieldCheck,
-    sections: [
-      ["1. Dados que tratamos", "Coletamos dados de cadastro, como nome, e-mail, cidade, universidade, tipo de participação, foto e informações opcionais de perfil. Também tratamos o conteúdo que você publica, preferências de e-mail e dados técnicos mínimos necessários para segurança e funcionamento."],
-      ["2. Como usamos", "Usamos esses dados para criar e proteger sua conta, mostrar seu perfil e participação em eventos, fóruns e grupos, prevenir abuso, responder a solicitações e enviar comunicações que você autorizou."],
-      ["3. Comunicações", "A confirmação de conta, a recuperação de senha e avisos de segurança são essenciais. Atualizações de eventos, fóruns e novidades são opcionais: no cadastro você escolhe recebê-las ou não, e cada e-mail inclui uma opção de descadastro por categoria."],
-      ["4. Compartilhamento", "Dados públicos do perfil e publicações aparecem conforme a funcionalidade escolhida por você. Não vendemos dados pessoais. Podemos utilizar provedores necessários para operar o serviço, como hospedagem, banco de dados e envio transacional de e-mail, sob obrigações de segurança."],
-      ["5. Retenção e segurança", "Mantemos dados enquanto sua conta existir ou pelo período necessário para cumprir obrigações legítimas. Aplicamos controles de acesso, tokens temporários e senhas armazenadas com hash; nenhum sistema, porém, é absolutamente imune a riscos."],
-      ["6. Seus direitos", "Você pode solicitar acesso, correção, eliminação ou informações sobre o tratamento de seus dados pelos canais oficiais do projeto, observadas as limitações legais e de segurança. Esta política foi atualizada em 14 de agosto de 2026."],
-    ],
-  },
-} as const;
+export const LegalPage: React.FC<LegalPageProps> = ({ kind = "terms" }) => {
+  const [activeTab, setActiveTab] = useState<"terms" | "privacy">(kind);
 
-const LegalPage = ({ kind }: LegalPageProps) => {
-  const page = content[kind];
-  const Icon = page.icon;
-  return <main className="min-h-screen bg-[#f7f9fd] px-4 py-6 text-[#1e293b] sm:px-6 sm:py-10">
-    <div className="mx-auto max-w-3xl">
-      <header className="mb-8 flex items-center justify-between"><a href="/" aria-label="Voltar ao Hub"><img src="/logo.png" alt="Google Student Ambassador" className="h-9 w-auto" /></a><a href="/register" className="inline-flex items-center gap-2 text-sm font-black hover:text-[#4285f4]"><ArrowLeft size={17} /> Criar conta</a></header>
-      <article className="overflow-hidden rounded-3xl border-3 border-[#1e293b] bg-white shadow-hard-black">
-        <div className="grid h-2 grid-cols-4"><span className="bg-[#4285f4]" /><span className="bg-[#ea4335]" /><span className="bg-[#fbbc04]" /><span className="bg-[#34a853]" /></div>
-        <div className="p-6 sm:p-10"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ebf3fe] text-[#4285f4]"><Icon size={25} /></div><p className="mt-6 text-xs font-black uppercase tracking-[0.14em] text-[#4285f4]">{page.eyebrow}</p><h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{page.title}</h1><p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-slate-600">{page.description}</p><div className="mt-9 space-y-7">{page.sections.map(([heading, body]) => <section key={heading}><h2 className="text-base font-black">{heading}</h2><p className="mt-2 text-sm leading-7 text-slate-600">{body}</p></section>)}</div></div>
-      </article>
-      <p className="mt-8 text-center text-xs font-medium text-slate-500">Google Student Ambassador Hub · Projeto acadêmico independente.</p>
-    </div>
-  </main>;
+  return (
+    <main className="min-h-screen bg-[#F8FAFE] px-4 py-6 text-[#1e293b] sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-4xl">
+        {/* Top Header */}
+        <header className="mb-8 flex items-center justify-between">
+          <a href="/" aria-label="Voltar ao Hub">
+            <Logo size="md" />
+          </a>
+          <div className="flex items-center gap-4">
+            <a
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-black text-slate-600 hover:text-[#4285F4] transition-colors"
+            >
+              <ArrowLeft size={16} /> Voltar ao Início
+            </a>
+            <a
+              href="/register"
+              className="inline-flex items-center gap-1.5 bg-[#4285F4] hover:bg-[#3367D6] text-white px-3.5 py-1.5 rounded-xl text-xs font-black transition-all shadow-2xs"
+            >
+              Criar Conta
+            </a>
+          </div>
+        </header>
+
+        {/* Tab Selector */}
+        <div className="flex gap-2 mb-6 p-1.5 bg-slate-200/80 rounded-2xl border-2 border-[#1e293b] w-fit shadow-hard-black">
+          <button
+            onClick={() => setActiveTab("terms")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+              activeTab === "terms"
+                ? "bg-white text-[#4285F4] shadow-sm border border-slate-300"
+                : "text-slate-700 hover:text-slate-900"
+            }`}
+          >
+            <FileText size={16} />
+            <span>Termos de Uso</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("privacy")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+              activeTab === "privacy"
+                ? "bg-white text-[#34A853] shadow-sm border border-slate-300"
+                : "text-slate-700 hover:text-slate-900"
+            }`}
+          >
+            <ShieldCheck size={16} />
+            <span>Política de Privacidade (LGPD)</span>
+          </button>
+        </div>
+
+        {/* Main Document Article */}
+        <article className="overflow-hidden rounded-3xl border-3 border-[#1e293b] bg-white shadow-hard-black">
+          <div className="h-2 w-full bg-gradient-to-r from-[#4285F4] via-[#EA4335] to-[#34A853]" />
+          
+          <div className="p-6 sm:p-10 lg:p-12">
+            
+            {/* TERMS OF USE CONTENT */}
+            {activeTab === "terms" && (
+              <div className="space-y-8 animate-fadeIn">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E8F0FE] text-[#4285F4] border-2 border-[#1e293b] shadow-2xs">
+                    <FileText size={24} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black uppercase tracking-wider text-[#4285F4]">
+                      Termos de Serviço &amp; Convivência Comunitária
+                    </span>
+                    <h1 className="text-2xl sm:text-3xl font-black text-[#1e293b]">
+                      Termos de Uso da Plataforma
+                    </h1>
+                  </div>
+                </div>
+
+                {/* Prominent Independence Disclaimer Alert */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF8E1] border-2 border-[#FBBC04] shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-xs sm:text-sm text-[#78350F] leading-relaxed">
+                      <p className="font-black">
+                        AVISO LEGAL DE INDEPENDÊNCIA E ISENÇÃO DE VÍNCULO CORPORATIVO:
+                      </p>
+                      <p>
+                        O <strong>Campus Ambassador Hub</strong> é uma plataforma autônoma, voluntária e independente desenvolvida por participantes da comunidade estudantil universitária. 
+                        <strong> ESTA PLATAFORMA NÃO É UM PRODUTO OFICIAL, NÃO É OPERADA, NÃO É PATROCINADA E NÃO POSSUI QUALQUER VÍNCULO SOCIETÁRIO, EMPREGATÍCIO, CONTRATUAL OU DE AFILIAÇÃO COM A GOOGLE LLC, AMPLIFICA OU SUAS AFILIADAS.</strong> 
+                        Marcas e nomes de terceiros mencionados para fins acadêmicos ou de contexto são de propriedade exclusiva de seus respectivos titulares.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-7 text-xs sm:text-sm text-slate-700 leading-relaxed font-normal">
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <Scale size={17} className="text-[#4285F4]" />
+                      1. Aceitação dos Termos e Capacidade Jurídica
+                    </h2>
+                    <p>
+                      Ao se cadastrar, navegar, publicar ou utilizar qualquer recurso do Campus Ambassador Hub, você declara ter lido, compreendido e concordado integralmente com estes Termos de Uso e com a nossa Política de Privacidade. O cadastro é permitido a estudantes e interessados a partir de 16 (dezesseis) anos de idade completos, nos termos da legislação brasileira.
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <AlertCircle size={17} className="text-[#EA4335]" />
+                      2. Responsabilidade Integral por Conteúdos e Atividades Postadas
+                    </h2>
+                    <p>
+                      <strong>Todo e qualquer conteúdo, evento, workshop, material didático, código, texto, link ou mídia postado, enviado ou organizado por você é de sua exclusiva e integral responsabilidade civil e penal.</strong>
+                    </p>
+                    <p>
+                      A plataforma opera exclusivamente como intermediadora tecnológica de hospedagem e compartilhamento comunitário (provedor de aplicações), conforme preconizado pelo <em>Artigo 19 da Lei Federal nº 12.965/2014 (Marco Civil da Internet)</em>. A administração do Hub não realiza controle editorial prévio sobre as postagens dos membros e se isenta de qualquer responsabilidade por opiniões, condutas ou transações de seus usuários.
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <Lock size={17} className="text-[#34A853]" />
+                      3. Cadastro Voluntário e Segurança das Credenciais
+                    </h2>
+                    <p>
+                      O ingresso na comunidade é estritamente individual e voluntário (100% Opt-in). Você se compromete a fornecer informações verídicas e manter sua senha de acesso em sigilo. É expressamente proibido compartilhar credenciais, tentar invadir contas de outros usuários ou utilizar automações/bots para extrair dados da plataforma sem autorização formal por escrito.
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <CheckCircle2 size={17} className="text-[#4285F4]" />
+                      4. Código de Conduta e Convivência Comunitária
+                    </h2>
+                    <p>
+                      Para manter um ecossistema seguro e enriquecedor de aprendizado em Inteligência Artificial e desenvolvimento tecnológico, é terminantemente proibido:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
+                      <li>Praticar qualquer forma de assédio, intimidação, discriminação (por gênero, raça, religião, orientação sexual, nacionalidade ou deficiência) ou discurso de ódio.</li>
+                      <li>Publicar conteúdo com intuito de spam, esquemas comerciais ilegais, vírus, malwares ou ataques cibernéticos.</li>
+                      <li>Violar direitos autorais, patentes, segredos industriais ou propriedade intelectual de terceiros.</li>
+                      <li>Divulgar dados pessoais de terceiros sem consentimento formal prévio (Doxxing).</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <Scale size={17} className="text-[#FBBC04]" />
+                      5. Eventos Acadêmicos e Workshops Universitários
+                    </h2>
+                    <p>
+                      Os eventos, palestras, summits e oficinas presenciais ou online cadastrados na plataforma são de iniciativa independente de seus respectivos organizadores ou diretórios acadêmicos. Cada organizador é o único responsável pela reserva de espaços, infraestrutura física, conformidade com os regulamentos de sua respectiva universidade e segurança dos participantes presentes.
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <HelpCircle size={17} className="text-slate-500" />
+                      6. Moderação, Suspensão e Encerramento de Contas
+                    </h2>
+                    <p>
+                      A equipe de moderação reserva-se o direito de, a seu exclusivo critério, remover conteúdos em desacordo com estes Termos e suspender ou encerrar definitivamente contas infratoras. O usuário também pode solicitar a exclusão irrevogável de sua conta e histórico diretamente através do seu painel de configurações.
+                    </p>
+                  </section>
+                </div>
+              </div>
+            )}
+
+            {/* PRIVACY POLICY CONTENT */}
+            {activeTab === "privacy" && (
+              <div className="space-y-8 animate-fadeIn">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E6F4EA] text-[#34A853] border-2 border-[#1e293b] shadow-2xs">
+                    <ShieldCheck size={24} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-black uppercase tracking-wider text-[#34A853]">
+                      Conformidade com a Lei Geral de Proteção de Dados (LGPD)
+                    </span>
+                    <h1 className="text-2xl sm:text-3xl font-black text-[#1e293b]">
+                      Política de Privacidade de Dados
+                    </h1>
+                  </div>
+                </div>
+
+                {/* Privacy Badge Card */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#E6F4EA] border-2 border-[#34A853] shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="w-5 h-5 text-[#137333] shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-xs sm:text-sm text-[#137333] leading-relaxed">
+                      <p className="font-black">
+                        COMPROMISSO COM A PRIVACIDADE &amp; LEI Nº 13.709/2018 (LGPD):
+                      </p>
+                      <p>
+                        A privacidade dos membros é um pilar fundacional do Campus Ambassador Hub. Coletamos apenas o estritamente indispensável para a identificação acadêmica e conexão voluntária entre estudantes, garantindo transparência, controle e segurança total.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-7 text-xs sm:text-sm text-slate-700 leading-relaxed font-normal">
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <Lock size={17} className="text-[#34A853]" />
+                      1. Princípio da Minimização e Dados Coletados
+                    </h2>
+                    <p>
+                      Coletamos e processamos exclusivamente os dados fornecidos voluntariamente por você durante a criação da conta e utilização da plataforma:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
+                      <li><strong>Identificação Básica:</strong> Nome completo, apelido (nome social de exibição) e data de nascimento (para validação de idade mínima legal).</li>
+                      <li><strong>Contato &amp; Acesso:</strong> Endereço de e-mail institucional ou pessoal e credenciais criptografadas via algoritmo <em>bcrypt</em>.</li>
+                      <li><strong>Vínculo Acadêmico:</strong> Estado, cidade, universidade vinculada e modalidade de participação (Embaixador ou Estudante).</li>
+                      <li><strong>Perfil Opcional:</strong> Biografia e links voluntários de redes acadêmicas (LinkedIn, GitHub).</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <Scale size={17} className="text-[#4285F4]" />
+                      2. Finalidade e Base Legal do Tratamento
+                    </h2>
+                    <p>
+                      O tratamento de dados pessoais é fundamentado no <em>Art. 7º, V da LGPD</em> (execução de contrato e procedimentos preliminares a pedido do titular) e no <em>Art. 7º, I</em> (consentimento explícito para comunicações e recursos adicionais). As informações são usadas unicamente para:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
+                      <li>Permitir o login, autenticação e gerenciamento seguro da sua conta.</li>
+                      <li>Habilitar a navegação e inscrição em eventos, workshops e cursos de IA no seu campus.</li>
+                      <li>Facilitar a conexão voluntária entre líderes estudantis da mesma instituição ou macrorregião.</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <CheckCircle2 size={17} className="text-[#EA4335]" />
+                      3. Não Comercialização e Não Compartilhamento Abusivo
+                    </h2>
+                    <p>
+                      <strong>O Campus Ambassador Hub não vende, não aluga e não monetiza seus dados pessoais para terceiros, anunciantes, empresas de marketing ou recrutadores externos.</strong> Os dados trafegam exclusivamente através de conexões encriptadas via protocolo SSL/TLS e serviços de infraestrutura essenciais contratados com elevados padrões de conformidade.
+                    </p>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <ShieldCheck size={17} className="text-[#34A853]" />
+                      4. Seus Direitos como Titular de Dados (Art. 18 da LGPD)
+                    </h2>
+                    <p>
+                      Você tem o direito pleno de, a qualquer momento e de forma facilitada:
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
+                      <li>Confirmar a existência de tratamento e acessar seus dados pessoais.</li>
+                      <li>Corrigir dados incompletos, inexatos ou desatualizados via Dashboard.</li>
+                      <li>Revogar o consentimento para envio de comunicados não essenciais.</li>
+                      <li>Solicitar a eliminação total e definitiva dos seus dados pessoais de nossa base de dados.</li>
+                    </ul>
+                  </section>
+
+                  <section className="space-y-2">
+                    <h2 className="text-base font-black text-[#1e293b] flex items-center gap-2">
+                      <Lock size={17} className="text-[#FBBC04]" />
+                      5. Segurança, Armazenamento e Cookies
+                    </h2>
+                    <p>
+                      Utilizamos cookies e armazenamento local (localStorage/sessionStorage) exclusivamente para retenção de sessão autenticada (Tokens JWT) e preferências de navegação técnica. Adotamos medidas de segurança contra injeções SQL, Cross-Site Scripting (XSS), Cross-Site Request Forgery (CSRF) e ataques de força bruta.
+                    </p>
+                  </section>
+                </div>
+              </div>
+            )}
+
+            {/* Footer Notice */}
+            <div className="mt-10 pt-6 border-t-2 border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-2xs sm:text-xs font-bold text-slate-500">
+              <p>Última revisão e atualização: Agosto de 2026</p>
+              <div className="flex items-center gap-4">
+                <a href="/terms" onClick={(e) => { e.preventDefault(); setActiveTab("terms"); }} className="hover:text-[#4285F4] transition-colors underline">Termos</a>
+                <a href="/privacy" onClick={(e) => { e.preventDefault(); setActiveTab("privacy"); }} className="hover:text-[#34A853] transition-colors underline">Privacidade</a>
+                <a href="/" className="hover:text-slate-800 transition-colors">Voltar ao Hub</a>
+              </div>
+            </div>
+
+          </div>
+        </article>
+
+        <p className="mt-6 text-center text-xs font-medium text-slate-500 max-w-xl mx-auto leading-relaxed">
+          Campus Ambassador Hub · Plataforma acadêmica independente mantida por estudantes. Todos os direitos reservados.
+        </p>
+      </div>
+    </main>
+  );
 };
 
 export default LegalPage;

@@ -32,7 +32,11 @@ export const userSchema = z.object({
   userType: z.enum(["ambassador", "student"]),
   universityId: z.string().trim().optional(),
   newUniversityName: universityNameSchema.optional(),
-  groupCode: z.string().trim().min(3).max(64).optional().transform((value) => value || undefined),
+  groupNumber: z.preprocess(
+    (value) => value === "" || value === undefined ? undefined : Number(value),
+    z.number().int().min(1).max(10).optional(),
+  ),
+  groupInviteCode: z.string().trim().toUpperCase().regex(/^G(?:0[1-9]|10)-[A-HJ-NP-Z2-9]{6}$/).optional(),
   termsAccepted: booleanFromForm.refine((value) => value, "Você precisa aceitar os Termos de Uso e a Política de Privacidade."),
   emailUpdates: booleanFromForm,
   avatarPath: z.string().startsWith("/uploads/avatars/").optional(),
@@ -50,8 +54,12 @@ export const userSchema = z.object({
     context.addIssue({ code: "custom", path: ["newUniversityName"], message: "Apenas embaixadores podem criar universidades." });
   }
 
-  if (user.userType === "student" && user.groupCode) {
-    context.addIssue({ code: "custom", path: ["groupCode"], message: "Apenas embaixadores podem entrar em grupos." });
+  if (user.userType === "student" && user.groupNumber) {
+    context.addIssue({ code: "custom", path: ["groupNumber"], message: "Apenas embaixadores podem entrar em grupos." });
+  }
+
+  if (user.userType === "student" && user.groupInviteCode) {
+    context.addIssue({ code: "custom", path: ["groupInviteCode"], message: "Códigos de grupo são exclusivos para embaixadores." });
   }
 });
 

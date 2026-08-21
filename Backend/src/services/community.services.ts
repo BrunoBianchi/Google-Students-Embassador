@@ -6,12 +6,15 @@ import { Forum } from "../database/models/forum.model";
 import { CommunityGroup } from "../database/models/group.model";
 import { ForumMessage } from "../database/models/message.model";
 import { University } from "../database/models/university.model";
+import { Campus } from "../database/models/campus.model";
+import { CampusMember } from "../database/models/campus-member.model";
 import { User } from "../database/models/user.model";
 import type { EventInput, EventUpdateInput, ForumInput, GroupInput } from "../database/schemas/community.schema";
 import { getUserBadges } from "./badge.services";
 import { getForum } from "./forum-message.services";
 import { attachAutoModerator, isAutoModeratorId } from "./forum-moderation.constants";
 import { notifyEventParticipants } from "./notification.services";
+import { findCampusBySlug, getCampusMembership } from "./campus.services";
 
 const eventRepository = () => AppDataSource.getMongoRepository(CommunityEvent);
 const groupRepository = () => AppDataSource.getMongoRepository(CommunityGroup);
@@ -31,6 +34,8 @@ const eventView = (event: CommunityEvent, userId?: ObjectId | null) => ({
   id: event._id.toHexString(), title: event.title, description: event.description,
   startsAt: event.startsAt, endsAt: event.endsAt, location: event.location, createdAt: event.createdAt,
   city: event.city ?? "", state: event.state ?? "", coordinates: event.coordinates,
+  visibility: event.visibility ?? "GLOBAL",
+  campusId: event.campusId?.toHexString() ?? null,
   capacity: event.capacity ?? null, imageUrls: event.imageUrls ?? [], tags: event.tags ?? [],
   participantCount: (event.participantIds ?? []).filter((participantId) => !participantId.equals(event.createdBy)).length,
   availableSpots: event.capacity ? Math.max(0, event.capacity - (event.participantIds ?? []).filter((participantId) => !participantId.equals(event.createdBy)).length) : null,
@@ -42,6 +47,7 @@ const eventView = (event: CommunityEvent, userId?: ObjectId | null) => ({
   groupId: event.groupId?.toHexString(),
   groupIds: (event.groupIds ?? (event.groupId ? [event.groupId] : [])).map((id) => id.toHexString()),
 });
+
 
 const forumView = (forum: Forum, userId: ObjectId) => ({
   id: forum._id.toHexString(), title: forum.title, description: forum.description, createdAt: forum.createdAt,
@@ -97,10 +103,28 @@ export const createEventForum = async (eventId: string, userId: ObjectId) => {
 };
 
 export const createEvent = async (input: EventInput, userId: ObjectId) => {
-  const { organizerIds: requestedOrganizerIds, groupId, createForum, ...eventInput } = input;
+  const { organizerIds: requestedOrganizerIds, groupId, createForum, campusId: rawCampusId, ...eventInput } = input;
   const requestedIds = requestedOrganizerIds.map((id) => new ObjectId(id));
   const requestedUsers = requestedIds.length ? await AppDataSource.getMongoRepository(User).findByIds(requestedIds) : [];
   if (requestedUsers.length !== requestedIds.length || requestedUsers.some((user) => !isVerifiedUser(user))) throw new Error("Event organizer not found");
+
+  let targetCampusId: ObjectId | undefined = undefined;
+  if (eventInput.visibility === "CAMPUS") {
+    if (!rawCampusId || !ObjectId.isValid(rawCampusId)) {
+      throw new Error("Campus not found");
+    }
+    targetCampusId = new ObjectId(rawCampusId);
+    // Enforce authorization: user must be an active AMBASSADOR or CAMPUS_ADMIN of targetCampusId
+    const membership = await getCampusMembership(userId, targetCampusId);
+    const user = await AppDataSource.getMongoRepository(User).findOneBy({ _id: userId });
+    const isAssociatedAmbassador = user?.userType === "ambassador" && user.universityId?.equals(targetCampusId);
+    const hasAmbassadorRole = membership && membership.status === "ACTIVE" && (membership.role === "AMBASSADOR" || membership.role === "CAMPUS_ADMIN");
+
+    if (!hasAmbassadorRole && !isAssociatedAmbassador) {
+      throw new Error("Event management denied");
+    }
+  }
+
   let groupMembers: ObjectId[] = [];
   if (groupId) {
     const group = await groupRepository().findOneBy({ _id: resourceId(groupId) });
@@ -109,12 +133,37 @@ export const createEvent = async (input: EventInput, userId: ObjectId) => {
   }
   const organizerIds = uniqueIds([userId, ...requestedIds, ...groupMembers]);
   const selectedGroupId = groupId ? new ObjectId(groupId) : undefined;
-  const event = eventRepository().create({ ...eventInput, createdBy: userId, participantIds: [userId], organizerIds, groupId: selectedGroupId, groupIds: selectedGroupId ? [selectedGroupId] : [], news: [] });
+  const event = eventRepository().create({
+    ...eventInput,
+    campusId: targetCampusId,
+    createdBy: userId,
+    participantIds: [userId],
+    organizerIds,
+    groupId: selectedGroupId,
+    groupIds: selectedGroupId ? [selectedGroupId] : [],
+    news: [],
+  });
   const saved = await eventRepository().save(event);
   return createForum ? createEventForum(saved._id.toHexString(), userId) : eventView(saved, userId);
 };
 
-export const updateEvent = async (eventId: string, input: EventUpdateInput, userId: ObjectId) => {
+
+export const updateEvent = async (
+  eventId: string,
+  arg2: EventUpdateInput | ObjectId,
+  arg3?: ObjectId | EventUpdateInput,
+) => {
+  let input: EventUpdateInput;
+  let userId: ObjectId;
+
+  if (arg2 instanceof ObjectId) {
+    userId = arg2;
+    input = arg3 as EventUpdateInput;
+  } else {
+    input = arg2 as EventUpdateInput;
+    userId = arg3 as ObjectId;
+  }
+
   const event = await requireEventManager(eventId, userId);
   Object.assign(event, input);
   return eventView(await eventRepository().save(event), userId);
@@ -129,6 +178,24 @@ export const deleteEvent = async (eventId: string, userId: ObjectId) => {
     await forumRepository().delete({ _id: event.forumId } as never);
   }
   await eventRepository().delete({ _id: event._id } as never);
+};
+
+export const cancelEvent = async (eventId: string, userId: ObjectId) => {
+  return deleteEvent(eventId, userId);
+};
+
+export const getEvent = async (eventId: string, viewerId?: ObjectId | null) => {
+  const details = await getEventDetails(eventId, viewerId);
+  if (!details) throw new Error("Resource not found");
+  return details;
+};
+
+export const participateInEvent = async (eventId: string, userId: ObjectId) => {
+  return setEventParticipation(eventId, userId, true);
+};
+
+export const cancelParticipation = async (eventId: string, userId: ObjectId) => {
+  return setEventParticipation(eventId, userId, false);
 };
 
 export const addEventOrganizer = async (eventId: string, organizerId: string, userId: ObjectId) => {
@@ -438,3 +505,219 @@ export const getPublicProfile = async (id: string, viewerId?: ObjectId | null) =
     badges,
   };
 };
+
+export const listCampusEvents = async (campusSlug: string, viewerId?: ObjectId | null) => {
+  const campus = await findCampusBySlug(campusSlug);
+  if (!campus) throw new Error("Campus not found");
+
+  let isMember = false;
+  if (viewerId) {
+    const membership = await getCampusMembership(viewerId, campus._id);
+    if (membership && membership.status === "ACTIVE") {
+      isMember = true;
+    } else {
+      const user = await AppDataSource.getMongoRepository(User).findOneBy({ _id: viewerId });
+      if (user && user.emailVerifiedAt && user.universityId?.equals(campus._id)) {
+        isMember = true;
+      }
+    }
+  }
+
+  const query: Record<string, unknown> = isMember
+    ? {
+        $or: [
+          { visibility: "GLOBAL" },
+          { visibility: { $exists: false } },
+          { visibility: "CAMPUS", campusId: campus._id },
+        ],
+      }
+    : {
+        $or: [
+          { visibility: "GLOBAL" },
+          { visibility: { $exists: false } },
+        ],
+      };
+
+  const events = await eventRepository().find({
+    where: query as never,
+    order: { startsAt: "ASC" },
+  });
+
+  const organizerIds = [...new Map(events.map((event) => [event.createdBy.toHexString(), event.createdBy])).values()];
+  const organizers = organizerIds.length
+    ? await AppDataSource.getMongoRepository(User).findByIds(organizerIds)
+    : [];
+  const universityIds = organizers.map((organizer) => organizer.universityId).filter(Boolean);
+  const universities = universityIds.length
+    ? await AppDataSource.getMongoRepository(University).findByIds(universityIds)
+    : [];
+  const universityNames = new Map(universities.map((university) => [university._id.toHexString(), university.name]));
+
+  const organizerViews = new Map(organizers.filter(isVerifiedUser).map((organizer) => [
+    organizer._id.toHexString(),
+    publicEventParticipant(
+      organizer,
+      organizer.universityId ? universityNames.get(organizer.universityId.toHexString()) ?? campus.name : campus.name,
+    ),
+  ]));
+
+
+
+  return {
+    campus: {
+      id: campus._id.toHexString(),
+      name: campus.name,
+      slug: campus.slug,
+      emailDomains: campus.emailDomains ?? [],
+    },
+    isMember,
+    events: events.map((event) => ({
+      ...eventView(event, viewerId),
+      organizer: organizerViews.get(event.createdBy.toHexString()),
+    })),
+  };
+};
+
+export const listCampusWorkshops = async (campusSlug: string, viewerId?: ObjectId | null) => {
+  const { campus, isMember, events } = await listCampusEvents(campusSlug, viewerId);
+  const workshopTags = new Set(["workshop", "study-jam", "ai", "cloud", "web", "android", "hackathon"]);
+  const workshops = events.filter((e) => e.tags.some((tag) => workshopTags.has(tag)) || e.title.toLowerCase().includes("workshop") || e.title.toLowerCase().includes("hands-on"));
+  return { campus, isMember, workshops };
+};
+
+export const getCampusResources = async (campusSlug: string, viewerId?: ObjectId | null) => {
+  const campus = await findCampusBySlug(campusSlug);
+  if (!campus) throw new Error("Campus not found");
+
+  const isMember = Boolean(viewerId && (await getCampusMembership(viewerId, campus._id))?.status === "ACTIVE");
+
+  return {
+    campus: {
+      id: campus._id.toHexString(),
+      name: campus.name,
+      slug: campus.slug,
+      description: campus.description ?? "",
+    },
+    isMember,
+    resources: [
+      {
+        id: "res-prompt-vault",
+        title: `Cofre de Prompts Acadêmicos · ${campus.name}`,
+        category: "Engenharia de Prompt",
+        description: "Prompts calibrados para revisões bibliográficas, resumos com tabelas conceituais e simulações de bancas acadêmicas.",
+        level: "Iniciante a Avançado",
+        isCampusExclusive: false,
+        url: "/students#prompts",
+      },
+      {
+        id: "res-anti-hallucination",
+        title: "Guia de Grounding e Anti-Alucinação",
+        category: "Rigor Científico",
+        description: "Metodologia passo a passo de Chain-of-Verification para validação cruzada de fontes em artigos e TCCs.",
+        level: "Intermediário",
+        isCampusExclusive: false,
+        url: "/students#anti-hallucination",
+      },
+      {
+        id: "res-study-group-kit",
+        title: `Kit de Liderança de Study Jams (${campus.slug.toUpperCase()})`,
+        category: "Comunidade",
+        description: "Roteiro completo para embaixadores e alunos organizarem grupos de estudos de IA no campus.",
+        level: "Liderança",
+        isCampusExclusive: true,
+        url: `/${campus.slug}/gemini`,
+      },
+    ],
+  };
+};
+
+export const getCampusGeminiHub = async (campusSlug: string, viewerId?: ObjectId | null) => {
+  const campus = await findCampusBySlug(campusSlug);
+  if (!campus) throw new Error("Campus not found");
+
+  const isMember = Boolean(viewerId && (await getCampusMembership(viewerId, campus._id))?.status === "ACTIVE");
+
+  return {
+    campus: {
+      id: campus._id.toHexString(),
+      name: campus.name,
+      slug: campus.slug,
+    },
+    isMember,
+    modules: [
+      {
+        id: "gemini-transformers",
+        title: "Mecanismo de Atenção e Transformers no Campus",
+        description: "Entenda a matemática e os pesos por trás dos modelos generativos com exemplos práticos desenvolvidos na universidade.",
+        icon: "cpu",
+      },
+      {
+        id: "gemini-study-jams",
+        title: `Study Jams de IA em ${campus.city ?? campus.name}`,
+        description: "Encontros práticos com notebooks, APIs e experimentação de prompts guiados por embaixadores.",
+        icon: "sparkles",
+      },
+    ],
+  };
+};
+
+export type ListGlobalEventsFilter = {
+
+  timeframe?: "upcoming" | "past" | "month" | "all";
+  tag?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+};
+
+export const listGlobalEvents = async (
+  filter: ListGlobalEventsFilter = {},
+  viewerId?: ObjectId | null,
+) => {
+  const events = await eventRepository().find({
+    where: { visibility: "GLOBAL" },
+    order: { startsAt: filter.timeframe === "past" ? "DESC" : "ASC" },
+  });
+
+  const now = Date.now();
+  let mapped = events.map((event) => eventView(event, viewerId));
+
+  if (filter.timeframe === "upcoming") {
+    mapped = mapped.filter((e) => new Date(e.startsAt).getTime() >= now);
+  } else if (filter.timeframe === "past") {
+    mapped = mapped.filter((e) => new Date(e.startsAt).getTime() < now);
+  } else if (filter.timeframe === "month") {
+    const thirtyDaysFromNow = now + 30 * 24 * 60 * 60 * 1000;
+    mapped = mapped.filter((e) => {
+      const time = new Date(e.startsAt).getTime();
+      return time >= now && time <= thirtyDaysFromNow;
+    });
+  }
+
+  if (filter.tag) {
+    mapped = mapped.filter((e) => e.tags.some((t) => t.toLowerCase() === filter.tag?.toLowerCase()));
+  }
+
+  if (filter.search) {
+    const q = filter.search.toLowerCase();
+    mapped = mapped.filter((e) =>
+      e.title.toLowerCase().includes(q) ||
+      e.description.toLowerCase().includes(q) ||
+      e.location.toLowerCase().includes(q) ||
+      e.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  }
+
+  const page = Math.max(filter.page ?? 1, 1);
+  const limit = Math.min(Math.max(filter.limit ?? 20, 1), 50);
+  const skip = (page - 1) * limit;
+
+  return {
+    total: mapped.length,
+    page,
+    limit,
+    events: mapped.slice(skip, skip + limit),
+  };
+};
+
+

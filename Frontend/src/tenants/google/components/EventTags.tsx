@@ -17,7 +17,7 @@ export const eventTagOptions = [
   { value: 'community', label: 'Comunidade', className: 'border-[#15803D] bg-[#DCFCE7] text-[#166534]' },
 ] as const;
 
-const tagByValue = new Map(eventTagOptions.map((tag) => [tag.value, tag]));
+const tagByValue = new Map<string, (typeof eventTagOptions)[number]>(eventTagOptions.map((tag) => [tag.value, tag]));
 
 export const EventTags = ({ tags, limit, className = '' }: { tags: string[]; limit?: number; className?: string }) => {
   const visibleTags = limit ? tags.slice(0, limit) : tags;

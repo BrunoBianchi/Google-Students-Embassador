@@ -9,10 +9,10 @@ Crie estes registros `A` no DNS da DigitalOcean, todos apontando para `206.81.1.
 | Host | Destino |
 | --- | --- |
 | `@` | `206.81.1.32` |
-| `google` | `206.81.1.32` |
+| `campus` | `206.81.1.32` |
 | `*` | `206.81.1.32` |
 
-O curinga é necessário para que `qualquer.studentembassador.com` chegue ao Nginx e seja redirecionado para `google.studentembassador.com`.
+O curinga é necessário para que `qualquer.studentembassador.com` (incluindo o legado `google.studentembassador.com`) chegue ao Nginx e seja redirecionado para `campus.studentembassador.com`.
 
 ## Preparar o servidor
 
@@ -35,7 +35,7 @@ Copie o projeto para `/opt/google-student-ambassador`, copie os arquivos `.env` 
 NODE_ENV=production
 HOST=127.0.0.1
 PORT=3000
-CANONICAL_HOST=google.studentembassador.com
+CANONICAL_HOST=campus.studentembassador.com
 API_ORIGIN=http://127.0.0.1:3001
 SEO_API_URL=http://127.0.0.1:3001/api/2026/google/seo/index
 
@@ -43,7 +43,7 @@ SEO_API_URL=http://127.0.0.1:3001/api/2026/google/seo/index
 NODE_ENV=production
 HOST=127.0.0.1
 PORT=3001
-FRONTEND_ORIGIN=https://google.studentembassador.com
+FRONTEND_ORIGIN=https://campus.studentembassador.com
 ```
 
 Como o usuário `gsa`, instale e compile:
@@ -76,7 +76,7 @@ unlink /etc/nginx/sites-enabled/default 2>/dev/null || true
 
 install -D -m 644 deploy/nginx/snippets/gsa-proxy.conf /etc/nginx/snippets/gsa-proxy.conf
 install -D -m 644 deploy/nginx/snippets/gsa-tls.conf /etc/nginx/snippets/gsa-tls.conf
-install -m 644 deploy/nginx/google.studentembassador.com.conf /etc/nginx/conf.d/google.studentembassador.com.conf
+install -m 644 deploy/nginx/campus.studentembassador.com.conf /etc/nginx/conf.d/campus.studentembassador.com.conf
 install -m 644 deploy/systemd/gsa-frontend.service /etc/systemd/system/gsa-frontend.service
 install -m 644 deploy/systemd/gsa-backend.service /etc/systemd/system/gsa-backend.service
 
@@ -90,7 +90,7 @@ nginx -t && systemctl reload nginx
 Mantenha somente SSH, HTTP e HTTPS acessíveis externamente. Não abra `3000`, `3001`, MongoDB ou qualquer outra porta da aplicação:
 
 ```bash
-ufw default deny incoming
+uflow default deny incoming
 ufw default allow outgoing
 ufw allow OpenSSH
 ufw allow 80/tcp
@@ -103,7 +103,7 @@ ufw status verbose
 
 ```bash
 ss -ltnp | grep -E ':(80|443|3000|3001)'
-curl -I https://google.studentembassador.com
+curl -I https://campus.studentembassador.com
 curl -I https://studentembassador.com/eventos
 curl -I https://teste.studentembassador.com/eventos
 ```
@@ -111,3 +111,4 @@ curl -I https://teste.studentembassador.com/eventos
 O resultado esperado é Nginx em `206.81.1.32:80` e `206.81.1.32:443`, enquanto os processos Bun aparecem somente em `127.0.0.1:3000` e `127.0.0.1:3001`.
 
 > Nenhuma configuração consegue impedir um processo malicioso que já tenha acesso administrativo ao próprio Droplet de chamar `127.0.0.1`. A proteção aplicada aqui bloqueia o acesso remoto direto: apenas o Nginx público conversa com os serviços internos, e os serviços rodam como usuário sem login (`gsa`).
+

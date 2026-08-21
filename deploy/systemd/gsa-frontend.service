@@ -1,5 +1,5 @@
 [Unit]
-Description=Google Student Ambassador Hub frontend
+Description=Campus Ambassador Hub frontend
 After=network-online.target
 Wants=network-online.target
 

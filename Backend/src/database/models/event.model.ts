@@ -3,6 +3,7 @@ import { Column, CreateDateColumn, Entity, ObjectIdColumn, UpdateDateColumn } fr
 
 export type EventCoordinates = { lat: number; lng: number };
 export type EventNews = { id: string; content: string; createdAt: Date; createdBy: ObjectId };
+export type EventVisibility = "GLOBAL" | "CAMPUS";
 
 @Entity({ name: "events" })
 export class CommunityEvent {
@@ -14,6 +15,13 @@ export class CommunityEvent {
 
   @Column()
   description!: string;
+
+  @Column()
+  visibility: EventVisibility = "GLOBAL";
+
+  @Column({ nullable: true })
+  campusId?: ObjectId;
+
 
   @Column()
   startsAt!: Date;

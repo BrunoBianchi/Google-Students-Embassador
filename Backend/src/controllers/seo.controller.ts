@@ -6,11 +6,15 @@ const seoController = Router();
 
 seoController.get("/index", async (_request: Request, response: Response, next: NextFunction) => {
   try {
-    const [events, forums, ambassadors] = await Promise.all([listEventDirectory(), listForumDirectory(), listAmbassadors()]);
+    const [events, forums, ambassadorData] = await Promise.all([
+      listEventDirectory(),
+      listForumDirectory(),
+      listAmbassadors({ limit: 100 }),
+    ]);
     return response.json({
       events: events.map((event) => ({ id: event.id, createdAt: event.createdAt, startsAt: event.startsAt })),
       forums: forums.map((forum) => ({ id: forum.id, createdAt: forum.createdAt })),
-      profiles: ambassadors.map((ambassador) => ({ id: ambassador.id })),
+      profiles: (ambassadorData.ambassadors || []).map((ambassador) => ({ id: ambassador.id })),
     });
   } catch (error) { return next(error); }
 });

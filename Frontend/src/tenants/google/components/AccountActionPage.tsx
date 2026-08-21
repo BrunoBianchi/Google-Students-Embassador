@@ -1,6 +1,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, KeyRound, MailCheck, MailX, ShieldCheck } from "lucide-react";
 import { authApi, type EmailPreferenceCategory } from "../../../services/auth";
+import Logo from "./Logo";
 
 type AccountAction = "verify" | "forgot" | "reset" | "unsubscribe";
 type Props = { action: AccountAction };
@@ -78,34 +79,59 @@ const AccountActionPage = ({ action }: Props) => {
         : { eyebrow: "Prefer\u00eancias de e-mail", title: "Atualiza\u00e7\u00f5es ajustadas", description: category ? `Voc\u00ea pode deixar de receber ${categoryLabels[category]} sem sair da comunidade.` : "Ajuste suas prefer\u00eancias de comunica\u00e7\u00e3o.", icon: MailX };
   const Icon = copy.icon;
 
-  return <main className="min-h-screen bg-[#f7f9fd] px-4 py-6 text-[#1e293b] sm:px-6 sm:py-10">
-    <div className="mx-auto max-w-xl">
-      <header className="mb-8 flex items-center justify-between"><a href="/" aria-label="Voltar ao Hub"><img src="/logo.png" alt="Google Student Ambassador" className="h-9 w-auto" /></a><a href="/login" className="inline-flex items-center gap-2 text-sm font-black hover:text-[#4285f4]"><ArrowLeft size={17} /> Entrar</a></header>
-      <section className="overflow-hidden rounded-3xl border-3 border-[#1e293b] bg-white shadow-hard-black">
-        <div className="grid h-2 grid-cols-4"><span className="bg-[#4285f4]" /><span className="bg-[#ea4335]" /><span className="bg-[#fbbc04]" /><span className="bg-[#34a853]" /></div>
-        <div className="p-6 sm:p-9">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ebf3fe] text-[#4285f4]"><Icon size={25} /></div>
-          <p className="mt-6 text-xs font-black uppercase tracking-[0.14em] text-[#4285f4]">{copy.eyebrow}</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{copy.title}</h1>
-          <p className="mt-3 max-w-lg text-sm font-medium leading-relaxed text-slate-600">{copy.description}</p>
+  return (
+    <main className="min-h-screen bg-[#f7f9fd] px-4 py-6 text-[#1e293b] sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-xl">
+        <header className="mb-8 flex items-center justify-between">
+          <a href="/" aria-label="Voltar ao Hub"><Logo size="sm" /></a>
+          <a href="/login" className="inline-flex items-center gap-2 text-sm font-black hover:text-[#4F46E5]"><ArrowLeft size={17} /> Entrar</a>
+        </header>
+        <section className="overflow-hidden rounded-3xl border-3 border-[#1e293b] bg-white shadow-hard-black">
+          <div className="h-2 w-full bg-gradient-to-r from-[#4F46E5] via-[#06B6D4] to-[#10B981]" />
+          <div className="p-6 sm:p-9">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+              <Icon size={25} />
+            </div>
+            <p className="mt-6 text-xs font-black uppercase tracking-[0.14em] text-[#4F46E5]">{copy.eyebrow}</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">{copy.title}</h1>
+            <p className="mt-3 max-w-lg text-sm font-medium leading-relaxed text-slate-600">{copy.description}</p>
 
-          {(action === "forgot" || action === "reset") && !status && <form onSubmit={submit} className="mt-7 space-y-5">
-            {action === "forgot" ? <label className="block"><span className="mb-2 block text-sm font-black">E-mail</span><input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="voce@universidade.edu.br" className="input-auth" /></label> : <>
-              <label className="block"><span className="mb-2 block text-sm font-black">Nova senha</span><input required minLength={8} type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className="input-auth" /></label>
-              <label className="block"><span className="mb-2 block text-sm font-black">Confirmar nova senha</span><input required minLength={8} type="password" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="input-auth" /></label>
-            </>}
-            <button disabled={loading} className="button-primary w-full justify-center" type="submit">{loading ? "Aguarde..." : action === "forgot" ? "Enviar link de recupera\u00e7\u00e3o" : "Salvar nova senha"}</button>
-          </form>}
+            {(action === "forgot" || action === "reset") && !status && (
+              <form onSubmit={submit} className="mt-7 space-y-5">
+                {action === "forgot" ? (
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-black">E-mail</span>
+                    <input required type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="voce@universidade.edu.br" className="input-auth" />
+                  </label>
+                ) : (
+                  <>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-black">Nova senha</span>
+                      <input required minLength={8} type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className="input-auth" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-black">Confirmar nova senha</span>
+                      <input required minLength={8} type="password" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="input-auth" />
+                    </label>
+                  </>
+                )}
+                <button disabled={loading} className="button-primary w-full justify-center" type="submit">
+                  {loading ? "Aguarde..." : action === "forgot" ? "Enviar link de recuperação" : "Salvar nova senha"}
+                </button>
+              </form>
+            )}
 
-          {loading && <p className="mt-7 rounded-xl bg-[#ebf3fe] px-4 py-3 text-sm font-bold text-[#264f91]">Estamos concluindo sua solicita\u00e7\u00e3o...</p>}
-          {status && <div className="mt-7 rounded-2xl border border-[#34a853]/30 bg-[#edf8f0] p-4 text-sm font-bold text-[#18723a]"><CheckCircle2 className="mr-2 inline-block" size={19} />{status}</div>}
-          {error && <div role="alert" className="mt-7 rounded-2xl border border-[#ea4335]/30 bg-[#fdf0ef] p-4 text-sm font-bold text-[#b3261e]"><p>{error}</p>{action === "verify" && <a href="/login" className="mt-3 inline-flex font-black text-[#4285f4] hover:underline">Solicitar novo link de confirmação</a>}</div>}
-          {status && <div className="mt-6 flex flex-wrap gap-3"><a href={action === "verify" ? "/dashboard" : "/login"} className="button-primary">{action === "verify" ? "Ir para o Hub" : "Ir para entrar"}</a>{action === "forgot" && <a href="/login" className="button-secondary">Voltar</a>}</div>}
-        </div>
-      </section>
-      <p className="mt-8 text-center text-xs font-medium text-slate-500">Projeto acad\u00eamico independente, sem v\u00ednculo oficial com a Google LLC.</p>
-    </div>
-  </main>;
+            {loading && <p className="mt-7 rounded-xl bg-[#EEF2FF] px-4 py-3 text-sm font-bold text-[#3730A3]">Estamos concluindo sua solicitação...</p>}
+            {status && <div className="mt-7 rounded-2xl border border-[#10B981]/30 bg-[#edf8f0] p-4 text-sm font-bold text-[#065F46]"><CheckCircle2 className="mr-2 inline-block" size={19} />{status}</div>}
+            {error && <div role="alert" className="mt-7 rounded-2xl border border-[#ea4335]/30 bg-[#fdf0ef] p-4 text-sm font-bold text-[#b3261e]"><p>{error}</p>{action === "verify" && <a href="/login" className="mt-3 inline-flex font-black text-[#4F46E5] hover:underline">Solicitar novo link de confirmação</a>}</div>}
+            {status && <div className="mt-6 flex flex-wrap gap-3"><a href={action === "verify" ? "/dashboard" : "/login"} className="button-primary">{action === "verify" ? "Ir para o Hub" : "Ir para entrar"}</a>{action === "forgot" && <a href="/login" className="button-secondary">Voltar</a>}</div>}
+          </div>
+        </section>
+        <p className="mt-8 text-center text-xs font-medium text-slate-500">Campus Ambassador Hub · Projeto independente sem vínculo oficial com a Google LLC ou Amplifica.</p>
+      </div>
+    </main>
+  );
 };
 
 export default AccountActionPage;
+

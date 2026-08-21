@@ -244,6 +244,7 @@ const Dashboard: React.FC = () => {
         instagramUrl: text(form, "instagramUrl"),
         phone: text(form, "phone"),
         avatarFrame: text(form, "avatarFrame") as AvatarFrame,
+        groupNumber: Number(text(form, "groupNumber")) || undefined,
       });
       setModal(null);
       await load();
@@ -688,9 +689,25 @@ const ProfilePage = ({
         <div className="flex gap-4">
           <Avatar profile={profile} large />
           <div>
-            <span className="rounded-full bg-[#FFF8E7] px-2 py-1 text-[10px] font-black uppercase text-[#9A6700]">
-              Perfil da comunidade
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-[#FFF8E7] px-2 py-1 text-[10px] font-black uppercase text-[#9A6700]">
+                Perfil da comunidade
+              </span>
+              {profile.groupCode ? (
+                <span className="rounded-full bg-[#EBF3FE] px-2.5 py-0.5 text-[10px] font-black text-[#4285F4] border border-[#4285F4]/30 flex items-center gap-1">
+                  <LockKeyhole size={11} /> {profile.groupCode}
+                </span>
+              ) : ambassador ? (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="rounded-full bg-[#FEF3C7] px-2.5 py-0.5 text-[10px] font-black text-[#B45309] border border-[#F59E0B]/30 hover:bg-[#FDE68A] transition-colors cursor-pointer"
+                  title="Defina seu grupo de embaixador"
+                >
+                  + Escolher Grupo (1 a 10)
+                </button>
+              ) : null}
+            </div>
             <h2 className="mt-2 text-2xl font-black">
               {profile.nickname ?? profile.name}
             </h2>
@@ -1168,6 +1185,50 @@ const ProfileModal = ({
               placeholder="+55 (11) 99999-9999"
             />
           </div>
+
+          {profile.userType === "ambassador" && (
+            <div className="pt-2">
+              {profile.groupCode ? (
+                <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4 flex items-center justify-between shadow-2xs">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <LockKeyhole size={14} className="text-[#4285F4]" />
+                      Grupo de Embaixador
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-medium block">
+                      Definido permanentemente
+                    </span>
+                  </div>
+                  <span className="bg-[#4285F4] text-white font-black text-xs px-3.5 py-1.5 rounded-xl shadow-2xs">
+                    {profile.groupCode}
+                  </span>
+                </div>
+              ) : (
+                <div className="rounded-2xl border-2 border-dashed border-[#4285F4]/50 bg-[#E8F0FE]/40 p-4 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                      <UsersRound size={14} className="text-[#4285F4]" />
+                      Escolher Grupo de Embaixador (1 até 10)
+                    </span>
+                    <span className="text-[10px] font-black text-[#EA4335] bg-[#FCE8E6] px-2 py-0.5 rounded-md border border-[#EA4335]/20">
+                      Escolha única
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                    Você ainda não selecionou seu grupo. Escolha abaixo para vincular sua conta. <strong>Após salvar, a escolha será permanente e não poderá ser alterada.</strong>
+                  </p>
+                  <select name="groupNumber" defaultValue="" className="input-auth !bg-white">
+                    <option value="">Nenhum / Escolher depois</option>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
+                      <option key={num} value={num}>
+                        Grupo {num}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div className="mt-5 flex shrink-0 gap-3 border-t border-slate-100 pt-4">

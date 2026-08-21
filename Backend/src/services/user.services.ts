@@ -7,19 +7,24 @@ import type { RegistrationInput } from "../database/schemas/user.schema";
 import type { LoginInput } from "../database/schemas/login.schema";
 import type { ProfileInput } from "../database/schemas/profile.schema";
 import { createOrFindUniversity, findUniversityById } from "./university.services";
+import { createOrFindCampus, ensureUserCampusMembership, findCampusById } from "./campus.services";
 import { getUserBadges, isAvatarFrameUnlocked } from "./badge.services";
 import type { EmailPreferences } from "../database/models/user.model";
 import { revokeUserSessions } from "./session.services";
+import { groupNumberForInviteCode } from "../config/ambassador-group-codes";
+
 
 const userRepository = () => AppDataSource.getMongoRepository(User);
 const universityRepository = () => AppDataSource.getMongoRepository(University);
 const inviteAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const newInviteCode = () => Array.from({ length: 8 }, () => inviteAlphabet[Math.floor(Math.random() * inviteAlphabet.length)]).join("");
+const newGroupCode = (groupNumber: number) => `G${String(groupNumber).padStart(2, "0")}-${Array.from({ length: 6 }, () => inviteAlphabet[Math.floor(Math.random() * inviteAlphabet.length)]).join("")}`;
 const includesUser = (ids: ObjectId[], userId: ObjectId) => ids.some((id) => id.equals(userId));
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 const newToken = () => randomBytes(32).toString("base64url");
 const preferences = (user: User): EmailPreferences => ({ eventUpdates: user.emailPreferences?.eventUpdates !== false, forumUpdates: user.emailPreferences?.forumUpdates !== false, productUpdates: user.emailPreferences?.productUpdates !== false });
 const isVerifiedUser = (user: Pick<User, "emailVerifiedAt">) => Boolean(user.emailVerifiedAt);
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const hasSameKeys = (existing: { key?: Record<string, number> }, keys: Record<string, number>) => {
   const current = existing.key ?? {};
@@ -33,6 +38,14 @@ const createInviteCode = async () => {
     if (!(await userRepository().findOneBy({ inviteCode: code }))) return code;
   }
   throw new Error("Could not create invite code");
+};
+
+const createGroupCode = async (groupNumber: number) => {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const code = newGroupCode(groupNumber);
+    if (!(await userRepository().findOneBy({ groupCode: code }))) return code;
+  }
+  throw new Error("Could not create group code");
 };
 
 export const ensureUserIndexes = async () => {
@@ -51,6 +64,10 @@ export const ensureUserIndexes = async () => {
 
   await ensure({ email: 1 }, { unique: true });
   await ensure({ inviteCode: 1 }, { unique: true, sparse: true, name: "user_invite_code_unique" });
+  await ensure(
+    { groupCode: 1 },
+    { unique: true, partialFilterExpression: { groupNumber: { $type: "number" } }, name: "user_group_code_unique" },
+  );
   await ensure({ userType: 1, state: 1, city: 1 }, { name: "ambassador_directory_filters" });
   await ensure({ emailVerificationTokenHash: 1 }, { sparse: true, name: "email_verification_token" });
   await ensure({ passwordResetTokenHash: 1 }, { sparse: true, name: "password_reset_token" });
@@ -60,17 +77,29 @@ export const ensureUserIndexes = async () => {
 export const createUser = async (registration: RegistrationInput): Promise<User> => {
   if (await findUseByEmail(registration.email)) throw new Error("User with this email already exists!");
 
+  const invitedGroupNumber = groupNumberForInviteCode(registration.groupInviteCode);
+  if (registration.groupInviteCode && !invitedGroupNumber) throw new Error("Invalid group invite code");
+  if (invitedGroupNumber && registration.groupNumber && invitedGroupNumber !== registration.groupNumber) {
+    throw new Error("Group invite code mismatch");
+  }
+  const assignedGroupNumber = invitedGroupNumber ?? registration.groupNumber;
+
   const university = registration.universityId
     ? await findUniversityById(registration.universityId)
     : await createOrFindUniversity(registration.newUniversityName!);
 
   if (!university) throw new Error("University not found");
 
+  // Ensure matching Campus entity is ready
+  await createOrFindCampus(university.name).catch(() => undefined);
+
   const inviter = registration.referralCode ? await userRepository().findOneBy({ inviteCode: registration.referralCode }) : null;
-  const { universityId: _universityId, newUniversityName: _newUniversityName, referralCode: _referralCode, termsAccepted: _termsAccepted, emailUpdates, ...userData } = registration;
+  const { universityId: _universityId, newUniversityName: _newUniversityName, referralCode: _referralCode, termsAccepted: _termsAccepted, emailUpdates, groupNumber: _groupNumber, groupInviteCode: _groupInviteCode, ...userData } = registration;
   const entity = userRepository().create({
     ...userData,
     universityId: university._id,
+    groupNumber: assignedGroupNumber,
+    groupCode: assignedGroupNumber ? await createGroupCode(assignedGroupNumber) : undefined,
     inviteCode: await createInviteCode(),
     referredById: inviter?._id,
     emailPreferenceToken: newToken(),
@@ -126,8 +155,26 @@ export const verifyEmail = async (token: string) => {
   user.emailVerifiedAt = new Date();
   user.emailVerificationTokenHash = undefined;
   user.emailVerificationExpiresAt = undefined;
-  return await userRepository().save(user);
+  const saved = await userRepository().save(user);
+
+  // Automatically activate Campus membership for the verified user
+  if (saved.universityId) {
+    const university = await findUniversityById(saved.universityId.toHexString());
+    if (university) {
+      const campus = await createOrFindCampus(university.name).catch(() => null);
+      if (campus) {
+        await ensureUserCampusMembership(
+          saved,
+          campus,
+          saved.userType === "ambassador" ? "AMBASSADOR" : "STUDENT",
+        ).catch(() => undefined);
+      }
+    }
+  }
+
+  return saved;
 };
+
 
 export const issuePasswordReset = async (email: string) => {
   const user = await findUserByEmail(email);
@@ -172,38 +219,204 @@ export const updateUserProfile = async (id: ObjectId, profile: ProfileInput): Pr
   if (profile.avatarFrame !== user.avatarFrame && !isAvatarFrameUnlocked(profile.avatarFrame, await getUserBadges(user))) {
     throw new Error("Essa moldura ainda está bloqueada. Conquiste o troféu indicado para desbloqueá-la.");
   }
-  Object.assign(user, profile);
+  if (profile.groupNumber && user.groupCode) {
+    throw new Error("O seu grupo já foi definido anteriormente e não pode ser alterado.");
+  }
+  if (user.userType === "student" && profile.groupNumber) {
+    throw new Error("Apenas embaixadores podem escolher um grupo.");
+  }
+  const { groupNumber, ...profileData } = profile;
+  Object.assign(user, profileData);
+  if (groupNumber) {
+    user.groupNumber = groupNumber;
+    user.groupCode = await createGroupCode(groupNumber);
+  }
   return await userRepository().save(user);
 };
 
-export const listAmbassadors = async (viewerId?: ObjectId | null) => {
+import { getRegionByState, getStatesForRegionSlug } from "./region.services";
+import { Campus } from "../database/models/campus.model";
+
+const campusRepository = () => AppDataSource.getMongoRepository(Campus);
+
+export type ListAmbassadorsOptions = {
+  campus?: string;
+  region?: string;
+  state?: string;
+  city?: string;
+  search?: string;
+  course?: string;
+  page?: number;
+  limit?: number;
+};
+
+export const listAmbassadors = async (
+  optionsOrViewer?: ListAmbassadorsOptions | ObjectId | null,
+  maybeViewerId?: ObjectId | null,
+) => {
+  const options: ListAmbassadorsOptions = (optionsOrViewer && typeof optionsOrViewer === "object" && !(optionsOrViewer instanceof ObjectId))
+    ? optionsOrViewer
+    : {};
+  const viewerId = optionsOrViewer instanceof ObjectId ? optionsOrViewer : maybeViewerId;
+
   const ambassadors = await userRepository().find({
     where: { userType: "ambassador" },
-    order: { createdAt: "DESC" },
+    order: { likes: "DESC", createdAt: "DESC" },
   });
-  const verifiedAmbassadors = ambassadors.filter(isVerifiedUser);
+
+  const verifiedAmbassadors = ambassadors.filter((amb) => {
+    if (!isVerifiedUser(amb)) return false;
+    if (amb.privacySettings?.isPublic === false) return false;
+    return true;
+  });
+
   const universityIds = verifiedAmbassadors.map((ambassador) => ambassador.universityId).filter(Boolean);
   const universities = universityIds.length
     ? await universityRepository().findByIds(universityIds)
     : [];
-  const universityNames = new Map(universities.map((university) => [university._id.toHexString(), university.name]));
+  const universityMap = new Map(universities.map((u) => [u._id.toHexString(), u.name]));
 
-  return verifiedAmbassadors.map((ambassador) => {
+  const campuses = await campusRepository().find({ where: { isActive: true } });
+  const campusSlugMap = new Map<string, { slug: string; name: string }>();
+  for (const c of campuses) {
+    campusSlugMap.set(c._id.toHexString(), { slug: c.slug, name: c.name });
+    campusSlugMap.set(c.name.toLowerCase(), { slug: c.slug, name: c.name });
+  }
+
+  let mapped = verifiedAmbassadors.map((ambassador) => {
     const likedByIds = ambassador.likedByIds ?? [];
+    const universityName = universityMap.get(ambassador.universityId?.toHexString() ?? "") ?? "Universidade";
+    const campusInfo = campusSlugMap.get(ambassador.universityId?.toHexString() ?? "") || campusSlugMap.get(universityName.toLowerCase());
+    const region = ambassador.region || getRegionByState(ambassador.state);
+
     return {
       id: ambassador._id.toHexString(),
       name: ambassador.name,
-      nickname: ambassador.nickname,
+      nickname: ambassador.nickname ?? "",
       avatarPath: ambassador.avatarPath,
       avatarFrame: ambassador.avatarFrame ?? "none",
-      bio: ambassador.bio,
+      bio: ambassador.privacySettings?.showBio !== false ? (ambassador.bio ?? "") : "",
       state: ambassador.state ?? "",
       city: ambassador.city ?? "",
-      universityName: universityNames.get(ambassador.universityId.toHexString()) ?? "Universidade não encontrada",
+      region,
+      course: ambassador.privacySettings?.showCourse !== false ? (ambassador.course ?? "") : "",
+      universityName: ambassador.privacySettings?.showCampus !== false ? universityName : "Universidade",
+      campusSlug: campusInfo?.slug ?? "",
+      githubUrl: ambassador.privacySettings?.showSocialLinks !== false ? ambassador.githubUrl : undefined,
+      linkedinUrl: ambassador.privacySettings?.showSocialLinks !== false ? ambassador.linkedinUrl : undefined,
+      instagramUrl: ambassador.privacySettings?.showSocialLinks !== false ? ambassador.instagramUrl : undefined,
       likes: ambassador.likes ?? likedByIds.length,
       likedByMe: Boolean(viewerId && includesUser(likedByIds, viewerId)),
     };
   });
+
+  // Apply filters
+  if (options.campus) {
+    const campusQuery = options.campus.trim().toLowerCase();
+    mapped = mapped.filter((a) => a.campusSlug.toLowerCase() === campusQuery || a.universityName.toLowerCase().includes(campusQuery));
+  }
+
+  if (options.region && options.region !== "ALL") {
+    const regionSlug = options.region.trim().toLowerCase();
+    const states = getStatesForRegionSlug(regionSlug);
+    if (states.length > 0) {
+      mapped = mapped.filter((a) => states.includes(a.state.toUpperCase()) || a.region.toLowerCase() === regionSlug);
+    } else {
+      mapped = mapped.filter((a) => a.region.toLowerCase().includes(regionSlug));
+    }
+  }
+
+  if (options.state && options.state !== "ALL") {
+    const stateQuery = options.state.trim().toUpperCase();
+    mapped = mapped.filter((a) => a.state.toUpperCase() === stateQuery);
+  }
+
+  if (options.city) {
+    const cityQuery = options.city.trim().toLowerCase();
+    mapped = mapped.filter((a) => a.city.toLowerCase().includes(cityQuery));
+  }
+
+  if (options.search) {
+    const q = options.search.trim().toLowerCase();
+    mapped = mapped.filter((a) =>
+      a.name.toLowerCase().includes(q) ||
+      a.nickname.toLowerCase().includes(q) ||
+      a.universityName.toLowerCase().includes(q) ||
+      a.city.toLowerCase().includes(q) ||
+      a.course.toLowerCase().includes(q) ||
+      a.bio.toLowerCase().includes(q)
+    );
+  }
+
+  const page = Math.max(options.page ?? 1, 1);
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
+  const skip = (page - 1) * limit;
+
+  return {
+    total: mapped.length,
+    page,
+    limit,
+    ambassadors: mapped.slice(skip, skip + limit),
+  };
+};
+
+export const getAmbassadorPublicProfile = async (identifier: string, viewerId?: ObjectId | null) => {
+  const isObjId = ObjectId.isValid(identifier);
+  let ambassador = isObjId
+    ? await userRepository().findOneBy({ _id: new ObjectId(identifier) })
+    : null;
+
+  if (!ambassador) {
+    ambassador = await userRepository().findOne({
+      where: {
+        nickname: { $regex: new RegExp(`^${escapeRegex(identifier.replace(/^@/, "").trim())}$`, "i") },
+      } as never,
+    });
+  }
+
+  if (!ambassador || !isVerifiedUser(ambassador)) {
+    throw new Error("Ambassador not found");
+  }
+
+  const university = ambassador.universityId
+    ? await universityRepository().findOneBy({ _id: ambassador.universityId })
+    : null;
+
+  const campus = university
+    ? await campusRepository().findOne({
+        where: {
+          $or: [
+            { name: { $regex: new RegExp(`^${escapeRegex(university.name)}$`, "i") } },
+          ],
+        } as never,
+      })
+    : null;
+
+  const likedByIds = ambassador.likedByIds ?? [];
+  const region = ambassador.region || getRegionByState(ambassador.state);
+
+  return {
+    id: ambassador._id.toHexString(),
+    name: ambassador.name,
+    nickname: ambassador.nickname ?? "",
+    avatarPath: ambassador.avatarPath,
+    avatarFrame: ambassador.avatarFrame ?? "none",
+    bio: ambassador.bio ?? "",
+    state: ambassador.state ?? "",
+    city: ambassador.city ?? "",
+    region,
+    course: ambassador.course ?? "",
+    universityName: university?.name ?? "Universidade",
+    campusSlug: campus?.slug ?? "",
+    campusName: campus?.name ?? university?.name ?? "",
+    githubUrl: ambassador.githubUrl,
+    linkedinUrl: ambassador.linkedinUrl,
+    instagramUrl: ambassador.instagramUrl,
+    likes: ambassador.likes ?? likedByIds.length,
+    likedByMe: Boolean(viewerId && includesUser(likedByIds, viewerId)),
+    userType: ambassador.userType,
+    joinedAt: ambassador.createdAt.toISOString(),
+  };
 };
 
 export const toggleProfileLike = async (profileId: string, viewerId: ObjectId) => {
