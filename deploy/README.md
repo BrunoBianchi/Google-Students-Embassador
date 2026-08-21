@@ -46,7 +46,13 @@ NODE_ENV=production
 HOST=127.0.0.1
 PORT=3001
 FRONTEND_ORIGIN=https://campus.studentembassador.com
+GOOGLE_OAUTH_CLIENT_ID=seu-client-id-web.apps.googleusercontent.com
 ```
+
+No cliente OAuth 2.0 do tipo **Aplicativo da Web** no Google Cloud, cadastre
+`https://campus.studentembassador.com` como origem JavaScript autorizada. Para
+desenvolvimento local, adicione também `http://localhost:3000`. O Client ID é
+público; o fluxo usa um ID token assinado, validado novamente pelo backend.
 
 Como o usuário `gsa`, instale e compile:
 

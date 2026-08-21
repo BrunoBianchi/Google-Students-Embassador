@@ -4,6 +4,7 @@ import { BeforeInsert, Column, CreateDateColumn, Entity, ObjectIdColumn, UpdateD
 export type UserType = "ambassador" | "student";
 export type AvatarFrame = "none" | "google" | "gold" | "rainbow" | "campus" | "gemini" | "orbit" | "pixel" | "network" | "constellation" | "chrome" | "android" | "cloud" | "firebase" | "maps" | "codejam" | "community" | "prism" | "devfest" | "studio" | "spark" | "material" | "heart" | "applause" | "comet" | "aura" | "mosaic";
 export type EmailPreferences = { eventUpdates: boolean; forumUpdates: boolean; productUpdates: boolean };
+export type AuthProvider = "password" | "google";
 
 export type AmbassadorPrivacySettings = {
   isPublic?: boolean;
@@ -29,6 +30,12 @@ export class User {
 
   @Column()
   password!: string;
+
+  @Column({ nullable: true })
+  googleSubject?: string;
+
+  @Column()
+  authProviders: AuthProvider[] = ["password"];
 
   @BeforeInsert()
   async hashPassword() {

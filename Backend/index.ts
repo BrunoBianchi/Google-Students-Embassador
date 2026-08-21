@@ -105,6 +105,22 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
     return response.status(401).json({ error: "E-mail ou senha inválidos" });
   }
 
+  if (error instanceof Error && error.message === "Google OAuth not configured") {
+    return response.status(503).json({ error: "O login com Google ainda não foi configurado" });
+  }
+
+  if (error instanceof Error && error.message === "Invalid Google credential") {
+    return response.status(401).json({ error: "Não foi possível validar sua conta Google. Tente novamente." });
+  }
+
+  if (error instanceof Error && error.message === "Google account not registered") {
+    return response.status(404).json({ error: "Esta conta Google ainda não está cadastrada. Crie sua conta primeiro." });
+  }
+
+  if (error instanceof Error && error.message === "Google account conflict") {
+    return response.status(409).json({ error: "Este e-mail já está vinculado a outra conta Google" });
+  }
+
   if (error instanceof Error && error.message === "Invalid group invite code") {
     return response.status(400).json({ error: "O código de convite do grupo é inválido ou não está mais disponível" });
   }

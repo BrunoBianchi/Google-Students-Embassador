@@ -208,6 +208,26 @@ type DiscussionInput = { title?: string; name?: string; description: string };
 type SessionResponse = { user: AuthUser };
 type LoginInput = { email: string; password: string };
 export type RegistrationResponse = { email: string; message: string };
+export type GoogleAuthResult = SessionResponse | {
+  requiresRegistration: true;
+  profile: { name: string; email: string; picture?: string };
+};
+export type GoogleRegistrationInput = {
+  credential: string;
+  name: string;
+  nickname?: string;
+  birth: string;
+  state: string;
+  city: string;
+  userType: 'ambassador' | 'student';
+  universityId?: string;
+  newUniversityName?: string;
+  groupNumber?: number;
+  groupInviteCode?: string;
+  termsAccepted: boolean;
+  emailUpdates: boolean;
+  referralCode?: string;
+};
 export type EmailPreferenceCategory = 'eventUpdates' | 'forumUpdates' | 'productUpdates';
 
 const isLocalDevelopmentHost = /(^|\.)localhost$/i.test(window.location.hostname) || window.location.hostname === '127.0.0.1';
@@ -237,6 +257,9 @@ export const authApi = {
   getSession: () => request<SessionResponse>('/user/me'),
   login: (input: LoginInput) => request<SessionResponse>('/user/login', { method: 'POST', body: JSON.stringify(input) }),
   register: (input: FormData) => request<RegistrationResponse>('/user/register', { method: 'POST', body: input }),
+  getGoogleAuthConfig: () => request<{ clientId: string }>('/user/google/config'),
+  authenticateWithGoogle: (credential: string, intent: 'login' | 'register') => request<GoogleAuthResult>('/user/google/authenticate', { method: 'POST', body: JSON.stringify({ credential, intent }) }),
+  registerWithGoogle: (input: GoogleRegistrationInput) => request<SessionResponse>('/user/google/register', { method: 'POST', body: JSON.stringify(input) }),
   validateGroupInviteCode: (code: string) => request<{ valid: true; code: string; groupNumber: number }>(`/user/group-invitations/${encodeURIComponent(code)}`),
   verifyEmail: (token: string) => request<SessionResponse>('/user/email-verification/verify', { method: 'POST', body: JSON.stringify({ token }) }),
   resendVerification: (email: string) => request<{ message: string }>('/user/email-verification/resend', { method: 'POST', body: JSON.stringify({ email }) }),

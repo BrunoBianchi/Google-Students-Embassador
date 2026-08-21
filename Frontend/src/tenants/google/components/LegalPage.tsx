@@ -214,7 +214,8 @@ export const LegalPage: React.FC<LegalPageProps> = ({ kind = "terms" }) => {
                     </p>
                     <ul className="list-disc pl-5 space-y-1.5 text-slate-600">
                       <li><strong>Identificação Básica:</strong> Nome completo, apelido (nome social de exibição) e data de nascimento (para validação de idade mínima legal).</li>
-                      <li><strong>Contato &amp; Acesso:</strong> Endereço de e-mail institucional ou pessoal e credenciais criptografadas via algoritmo <em>bcrypt</em>.</li>
+                      <li><strong>Contato &amp; Acesso:</strong> Endereço de e-mail institucional ou pessoal e senha protegida por hash forte, quando o acesso por senha for utilizado.</li>
+                      <li><strong>Login com Google:</strong> Quando você escolhe essa opção, recebemos do Google o identificador estável da conta, nome, e-mail verificado e, quando disponibilizada, a URL da foto. Não recebemos sua senha Google.</li>
                       <li><strong>Vínculo Acadêmico:</strong> Estado, cidade, universidade vinculada e modalidade de participação (Embaixador ou Estudante).</li>
                       <li><strong>Perfil Opcional:</strong> Biografia e links voluntários de redes acadêmicas (LinkedIn, GitHub).</li>
                     </ul>
@@ -243,6 +244,7 @@ export const LegalPage: React.FC<LegalPageProps> = ({ kind = "terms" }) => {
                     <p>
                       <strong>O Campus Ambassador Hub não vende, não aluga e não monetiza seus dados pessoais para terceiros, anunciantes, empresas de marketing ou recrutadores externos.</strong> Os dados trafegam exclusivamente através de conexões encriptadas via protocolo SSL/TLS e serviços de infraestrutura essenciais contratados com elevados padrões de conformidade.
                     </p>
+                    <p>Ao optar pelo login federado, o Google Identity Services processa a autenticação conforme os termos e a política de privacidade do Google; o Hub utiliza somente o ID token assinado para confirmar sua identidade.</p>
                   </section>
 
                   <section className="space-y-2">

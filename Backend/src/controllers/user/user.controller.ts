@@ -2,7 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import multer from "multer";
 import { extname, join } from "node:path";
 import { mkdir, readFile, unlink } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { loginSchema } from "../../database/schemas/login.schema";
 import { userSchema } from "../../database/schemas/user.schema";
@@ -10,7 +10,7 @@ import { profileSchema } from "../../database/schemas/profile.schema";
 import { getAuthenticatedUserId, readCookie, requireAuth, SESSION_COOKIE_NAME, type AuthenticatedRequest } from "../middleware/auth.middleware";
 import { authRateLimit } from "../middleware/security.middleware";
 import { createServerSession, revokeServerSession } from "../../services/session.services";
-import { createUser, findUserByEmail, findUserById, issueEmailVerification, issuePasswordReset, listAmbassadors, loginUser, resetPassword, restoreEmailVerification, restorePasswordReset, toggleAmbassadorLike, toggleProfileLike, unsubscribeEmailCategory, updateUserProfile, verifyEmail } from "../../services/user.services";
+import { authenticateGoogleUser, createGoogleUser, createUser, findUserByEmail, findUserById, issueEmailVerification, issuePasswordReset, listAmbassadors, loginUser, resetPassword, restoreEmailVerification, restorePasswordReset, toggleAmbassadorLike, toggleProfileLike, unsubscribeEmailCategory, updateUserProfile, verifyEmail } from "../../services/user.services";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../../services/mail.services";
 import { getDashboard } from "../../services/community.services";
 import { getPublicProfile } from "../../services/community.services";
@@ -18,6 +18,7 @@ import { ensureUserInviteCode } from "../../services/user.services";
 import { getUserCampuses } from "../../services/campus.services";
 import type { User } from "../../database/models/user.model";
 import { groupNumberForInviteCode } from "../../config/ambassador-group-codes";
+import { getGoogleOAuthClientId, verifyGoogleCredential } from "../../services/google-auth.services";
 
 
 const userController = Router();
@@ -28,6 +29,10 @@ const emailSchema = z.object({ email: z.string().trim().toLowerCase().email().ma
 const tokenSchema = z.object({ token: z.string().min(32).max(256) });
 const passwordResetSchema = tokenSchema.extend({ password: z.string().min(8).max(128) });
 const unsubscribeSchema = tokenSchema.extend({ category: z.enum(["eventUpdates", "forumUpdates", "productUpdates"]) });
+const googleCredentialSchema = z.object({
+  credential: z.string().min(100).max(8_192),
+  intent: z.enum(["login", "register"]),
+});
 
 userController.get("/group-invitations/:code", authRateLimit, (request: Request, response: Response) => {
   const code = String(request.params.code ?? "").trim().toUpperCase();
@@ -110,6 +115,45 @@ const issueAndSendVerification = async (user: User) => {
     throw error;
   }
 };
+
+userController.get("/google/config", (_request: Request, response: Response) => {
+  return response.json({ clientId: getGoogleOAuthClientId() });
+});
+
+userController.post("/google/authenticate", authRateLimit, async (request: Request, response: Response, next: NextFunction) => {
+  try {
+    const { credential, intent } = googleCredentialSchema.parse(request.body);
+    const identity = await verifyGoogleCredential(credential);
+    const existing = await authenticateGoogleUser(identity);
+    if (existing) return await startSession(existing, response, 200);
+    if (intent === "login") throw new Error("Google account not registered");
+
+    return response.json({
+      requiresRegistration: true,
+      profile: { name: identity.name, email: identity.email, picture: identity.picture },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+userController.post("/google/register", authRateLimit, async (request: Request, response: Response, next: NextFunction) => {
+  try {
+    const credential = z.string().min(100).max(8_192).parse(request.body?.credential);
+    const identity = await verifyGoogleCredential(credential);
+    const existing = await authenticateGoogleUser(identity);
+    if (existing) return await startSession(existing, response, 200);
+
+    const registration = userSchema.parse({
+      ...request.body,
+      email: identity.email,
+      password: randomBytes(32).toString("base64url"),
+    });
+    return await startSession(await createGoogleUser(registration, identity), response, 201);
+  } catch (error) {
+    return next(error);
+  }
+});
 
 userController.post("/register", authRateLimit, upload.single("avatar"), async (request: Request, response: Response, next: NextFunction) => {
   try {

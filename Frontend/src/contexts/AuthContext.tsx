@@ -1,11 +1,13 @@
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
-import { authApi, type AuthUser, type ProfileInput, type RegistrationResponse } from '../services/auth';
+import { authApi, type AuthUser, type GoogleAuthResult, type GoogleRegistrationInput, type ProfileInput, type RegistrationResponse } from '../services/auth';
 
 type AuthContextValue = {
   user: AuthUser | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: FormData) => Promise<RegistrationResponse>;
+  authenticateWithGoogle: (credential: string, intent: 'login' | 'register') => Promise<GoogleAuthResult>;
+  registerWithGoogle: (data: GoogleRegistrationInput) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: ProfileInput) => Promise<void>;
 };
@@ -32,6 +34,15 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     },
     register: async (data) => {
       return await authApi.register(data);
+    },
+    authenticateWithGoogle: async (credential, intent) => {
+      const result = await authApi.authenticateWithGoogle(credential, intent);
+      if ('user' in result) setUser(result.user);
+      return result;
+    },
+    registerWithGoogle: async (data) => {
+      const { user: sessionUser } = await authApi.registerWithGoogle(data);
+      setUser(sessionUser);
     },
     logout: async () => {
       await authApi.logout();

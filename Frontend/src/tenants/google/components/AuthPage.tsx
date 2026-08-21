@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, Building2, Check, ChevronLeft, Eye, EyeOff, Lock
 import { useAuth } from '../../../contexts/AuthContext';
 import { authApi, type University } from '../../../services/auth';
 import Logo from './Logo';
+import GoogleIdentityButton from './GoogleIdentityButton';
 
 type AuthMode = 'login' | 'register';
 type AccountType = 'ambassador' | 'student';
@@ -54,13 +55,14 @@ const loadDraft = (): RegistrationDraft => {
 
 const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
   const isLogin = mode === 'login';
-  const { login, register } = useAuth();
+  const { login, register, authenticateWithGoogle, registerWithGoogle } = useAuth();
   const [draft, setDraft] = useState<RegistrationDraft>(loadDraft);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [universities, setUniversities] = useState<University[]>([]);
+  const [googleCredential, setGoogleCredential] = useState<string | null>(null);
 
   const updateDraft = (changes: Partial<RegistrationDraft>) => {
     setDraft((current) => ({ ...current, ...changes }));
@@ -113,11 +115,32 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     }
     if (step === 3) {
       if (!draft.email.includes('@')) { setStatus('Informe um e-mail válido.'); return false; }
-      if (password.length < 8) { setStatus('A senha precisa ter pelo menos 8 caracteres.'); return false; }
+      if (!googleCredential && password.length < 8) { setStatus('A senha precisa ter pelo menos 8 caracteres.'); return false; }
       if (!draft.agreed) { setStatus('Você precisa aceitar os Termos de Uso e a Política de Privacidade.'); return false; }
       return true;
     }
     return true;
+  };
+
+  const handleGoogleCredential = async (credential: string) => {
+    setIsSubmitting(true);
+    setStatus('Validando sua conta Google...');
+    try {
+      const result = await authenticateWithGoogle(credential, isLogin ? 'login' : 'register');
+      if ('user' in result) {
+        sessionStorage.removeItem(draftKey);
+        window.location.assign('/');
+        return;
+      }
+
+      setGoogleCredential(credential);
+      updateDraft({ name: result.profile.name, email: result.profile.email, step: 1 });
+      setStatus('Conta Google validada. Complete os dados do seu perfil para finalizar o cadastro.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Não foi possível entrar com o Google.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const nextStep = () => {
@@ -128,6 +151,38 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     if (!validateStep(1)) { setDraft((current) => ({ ...current, step: 1 })); return; }
     if (!validateStep(2)) { setDraft((current) => ({ ...current, step: 2 })); return; }
     if (!validateStep(3) || !draft.userType) return;
+    const referralCode = new URLSearchParams(window.location.search).get('ref')?.trim().toUpperCase();
+
+    if (googleCredential) {
+      setIsSubmitting(true);
+      setStatus('');
+      try {
+        await registerWithGoogle({
+          credential: googleCredential,
+          name: draft.name,
+          nickname: draft.nickname || undefined,
+          birth: draft.birth,
+          state: draft.state,
+          city: draft.city.trim(),
+          userType: draft.userType,
+          universityId: draft.selectedUniversity?.id,
+          newUniversityName: draft.creatingUniversity ? draft.universityQuery : undefined,
+          groupNumber: draft.userType === 'ambassador' && draft.groupCode ? Number(draft.groupCode) : undefined,
+          groupInviteCode: draft.userType === 'ambassador' && draft.groupInviteCode ? draft.groupInviteCode : undefined,
+          termsAccepted: draft.agreed,
+          emailUpdates: draft.emailUpdates,
+          referralCode: referralCode && /^[A-Z0-9]{8}$/.test(referralCode) ? referralCode : undefined,
+        });
+        sessionStorage.removeItem(draftKey);
+        window.location.assign('/');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Não foi possível criar sua conta com o Google.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     const formData = new FormData();
     formData.set('name', draft.name);
     formData.set('nickname', draft.nickname);
@@ -143,7 +198,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     if (draft.creatingUniversity) formData.set('newUniversityName', draft.universityQuery);
     if (draft.userType === 'ambassador' && draft.groupCode) formData.set('groupNumber', draft.groupCode);
     if (draft.userType === 'ambassador' && draft.groupInviteCode) formData.set('groupInviteCode', draft.groupInviteCode);
-    const referralCode = new URLSearchParams(window.location.search).get('ref')?.trim().toUpperCase();
     if (referralCode && /^[A-Z0-9]{8}$/.test(referralCode)) formData.set('referralCode', referralCode);
 
     setIsSubmitting(true);
@@ -227,6 +281,29 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
               <h2 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight">{isLogin ? 'Entrar no Hub' : draft.step === 1 ? 'Vamos começar' : draft.step === 2 ? 'Seu perfil no campus' : 'Proteja seu acesso'}</h2>
               <p className="mt-3 text-sm text-slate-600 font-medium">{isLogin ? 'Entre com seu e-mail e senha para acessar a comunidade.' : draft.step === 1 ? 'Conte como você participa da comunidade.' : draft.step === 2 ? 'Essas informações ajudam a conectar sua rede local.' : 'Revise e crie sua conta.'}</p>
 
+              {!googleCredential ? (
+                <div className="mt-6">
+                  <div className="flex justify-center">
+                    <GoogleIdentityButton
+                      mode={mode}
+                      disabled={isSubmitting}
+                      onCredential={(credential) => void handleGoogleCredential(credential)}
+                      onError={setStatus}
+                    />
+                  </div>
+                  <div className="my-5 flex items-center gap-3 text-2xs font-black uppercase tracking-widest text-slate-400">
+                    <span className="h-px flex-1 bg-slate-200" />
+                    ou continue com e-mail
+                    <span className="h-px flex-1 bg-slate-200" />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-[#34A853]/30 bg-[#E6F4EA] px-4 py-3 text-xs font-bold text-[#137333]">
+                  <span className="flex items-center gap-2"><Check size={16} /> Conta Google confirmada: {draft.email}</span>
+                  <button type="button" onClick={() => setGoogleCredential(null)} className="mt-2 font-black underline">Usar outra forma de cadastro</button>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-5">
                 {isLogin && <>
                   <label className="block"><span className="mb-2 block text-sm font-black">E-mail</span><span className="relative block"><Mail size={18} className="input-icon absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" /><input required value={draft.email} onChange={(event) => updateDraft({ email: event.target.value })} type="email" autoComplete="email" placeholder="voce@universidade.edu.br" className="input-auth input-auth-leading-icon" /></span></label>
@@ -276,11 +353,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                     <span className="mb-2 block text-sm font-black">E-mail institucional ou de acesso</span>
                     <span className="relative block">
                       <Mail size={18} className="input-icon absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input required value={draft.email} onChange={(event) => updateDraft({ email: event.target.value })} type="email" autoComplete="email" placeholder="voce@universidade.edu.br" className="input-auth input-auth-leading-icon" />
+                      <input required disabled={Boolean(googleCredential)} value={draft.email} onChange={(event) => updateDraft({ email: event.target.value })} type="email" autoComplete="email" placeholder="voce@universidade.edu.br" className="input-auth input-auth-leading-icon disabled:bg-slate-100 disabled:text-slate-500" />
                     </span>
                   </label>
 
-                  <PasswordField password={password} setPassword={setPassword} showPassword={showPassword} setShowPassword={setShowPassword} />
+                  {!googleCredential && <PasswordField password={password} setPassword={setPassword} showPassword={showPassword} setShowPassword={setShowPassword} />}
 
                   {/* Minimalist Checkboxes */}
                   <div className="space-y-3 pt-2">
@@ -310,12 +387,12 @@ const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                     </label>
                   </div>
 
-                  <p className="text-2xs text-slate-400">Por segurança, sua senha nunca é gravada em rascunhos temporários.</p>
+                  <p className="text-2xs text-slate-400">{googleCredential ? 'Sua identidade será confirmada novamente pelo Google ao criar a conta.' : 'Por segurança, sua senha nunca é gravada em rascunhos temporários.'}</p>
                 </>}
 
                 <div className="flex gap-3 pt-1">
                   {!isLogin && draft.step > 1 && <button type="button" onClick={() => updateDraft({ step: draft.step - 1 })} className="button-secondary"><ChevronLeft size={18} />Voltar</button>}
-                  <button disabled={isSubmitting} type="submit" className="button-primary flex-1">{isSubmitting ? 'Aguarde…' : isLogin ? 'Entrar no Hub' : draft.step === 3 ? 'Criar minha conta' : 'Avançar'} <ArrowRight size={18} /></button>
+                  <button disabled={isSubmitting} type="submit" className="button-primary flex-1">{isSubmitting ? 'Aguarde…' : isLogin ? 'Entrar no Hub' : draft.step === 3 ? googleCredential ? 'Criar conta com Google' : 'Criar minha conta' : 'Avançar'} <ArrowRight size={18} /></button>
                 </div>
               </form>
               {status && <div role="status" className="mt-5 rounded-xl bg-[#EEF2FF] px-4 py-3 text-xs font-bold border border-[#4F46E5]/30"><p>{status}</p>{isLogin && draft.email && <button type="button" disabled={isSubmitting} onClick={resendVerification} className="mt-2 font-black text-[#4F46E5] hover:underline">Reenviar confirmação por e-mail</button>}</div>}

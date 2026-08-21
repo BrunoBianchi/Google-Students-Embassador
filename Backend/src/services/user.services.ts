@@ -12,6 +12,7 @@ import { getUserBadges, isAvatarFrameUnlocked } from "./badge.services";
 import type { EmailPreferences } from "../database/models/user.model";
 import { revokeUserSessions } from "./session.services";
 import { groupNumberForInviteCode } from "../config/ambassador-group-codes";
+import type { GoogleIdentity } from "./google-auth.services";
 
 
 const userRepository = () => AppDataSource.getMongoRepository(User);
@@ -63,6 +64,7 @@ export const ensureUserIndexes = async () => {
   };
 
   await ensure({ email: 1 }, { unique: true });
+  await ensure({ googleSubject: 1 }, { unique: true, sparse: true, name: "user_google_subject_unique" });
   await ensure({ inviteCode: 1 }, { unique: true, sparse: true, name: "user_invite_code_unique" });
   await ensure(
     { groupCode: 1 },
@@ -108,6 +110,51 @@ export const createUser = async (registration: RegistrationInput): Promise<User>
     emailPreferences: { eventUpdates: emailUpdates, forumUpdates: emailUpdates, productUpdates: emailUpdates },
   });
   return await userRepository().save(entity);
+};
+
+const activateCampusMembership = async (user: User) => {
+  if (!user.universityId) return;
+  const university = await findUniversityById(user.universityId.toHexString());
+  if (!university) return;
+  const campus = await createOrFindCampus(university.name).catch(() => null);
+  if (!campus) return;
+  await ensureUserCampusMembership(
+    user,
+    campus,
+    user.userType === "ambassador" ? "AMBASSADOR" : "STUDENT",
+  ).catch(() => undefined);
+};
+
+export const authenticateGoogleUser = async (identity: GoogleIdentity): Promise<User | null> => {
+  const bySubject = await userRepository().findOneBy({ googleSubject: identity.subject });
+  if (bySubject) return bySubject;
+
+  const user = await findUserByEmail(identity.email);
+  if (!user) return null;
+  if (user.googleSubject && user.googleSubject !== identity.subject) throw new Error("Google account conflict");
+
+  user.googleSubject = identity.subject;
+  user.authProviders = Array.from(new Set([...(user.authProviders ?? ["password"]), "google"]));
+  user.emailVerifiedAt ??= new Date();
+  user.emailVerificationTokenHash = undefined;
+  user.emailVerificationExpiresAt = undefined;
+  const saved = await userRepository().save(user);
+  await activateCampusMembership(saved);
+  return saved;
+};
+
+export const createGoogleUser = async (registration: RegistrationInput, identity: GoogleIdentity): Promise<User> => {
+  if (registration.email !== identity.email) throw new Error("Invalid Google credential");
+  const existing = await authenticateGoogleUser(identity);
+  if (existing) return existing;
+
+  const user = await createUser(registration);
+  user.googleSubject = identity.subject;
+  user.authProviders = ["google"];
+  user.emailVerifiedAt = new Date();
+  const saved = await userRepository().save(user);
+  await activateCampusMembership(saved);
+  return saved;
 };
 
 export const findUseByEmail = async (email: string): Promise<boolean> => {
@@ -158,19 +205,7 @@ export const verifyEmail = async (token: string) => {
   const saved = await userRepository().save(user);
 
   // Automatically activate Campus membership for the verified user
-  if (saved.universityId) {
-    const university = await findUniversityById(saved.universityId.toHexString());
-    if (university) {
-      const campus = await createOrFindCampus(university.name).catch(() => null);
-      if (campus) {
-        await ensureUserCampusMembership(
-          saved,
-          campus,
-          saved.userType === "ambassador" ? "AMBASSADOR" : "STUDENT",
-        ).catch(() => undefined);
-      }
-    }
-  }
+  await activateCampusMembership(saved);
 
   return saved;
 };
