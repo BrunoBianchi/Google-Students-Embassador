@@ -141,11 +141,42 @@ const injectSocialCard = (html: string, card: SocialCard, canonical: string) => 
   return withoutOldMeta.replace("</head>", `${tags}\n</head>`);
 };
 let productionHtml: Promise<string> | undefined;
+const knownPagePaths = new Set([
+  "/", "/login", "/register", "/verify-email", "/forgot-password", "/reset-password", "/unsubscribe",
+  "/terms", "/privacy", "/students", "/estudantes", "/dashboard", "/map", "/about", "/programs",
+  "/opportunities", "/partners", "/campuses", "/events", "/ambassadors", "/regions", "/announcements",
+]);
+const campusSubroutes = new Set(["events", "workshops", "resources", "gemini", "about"]);
+const checkApiResource = async (path: string) => {
+  try {
+    const response = await fetch(`${apiOrigin}/api/2026/google${path}`, { signal: AbortSignal.timeout(3_000) });
+    return response.status === 404 ? 404 : 200;
+  } catch {
+    // Do not turn a temporary backend outage into a cached 404.
+    return 200;
+  }
+};
+const routeStatusFor = async (request: Request) => {
+  const pathname = new URL(request.url).pathname.replace(/\/+$/, "") || "/";
+  if (knownPagePaths.has(pathname)) return 200;
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 2 && segments[0] === "events") return checkApiResource(`/events/${encodeURIComponent(segments[1]!)}`);
+  if (segments.length === 2 && segments[0] === "u") return checkApiResource(`/user/public/${encodeURIComponent(segments[1]!)}`);
+  if (segments.length === 2 && segments[0] === "ambassadors") return checkApiResource(`/connect/ambassadors/${encodeURIComponent(segments[1]!)}`);
+  if (segments.length === 2 && segments[0] === "regions") return checkApiResource(`/connect/regions/${encodeURIComponent(segments[1]!)}`);
+  if (segments.length === 1) return checkApiResource(`/campuses/${encodeURIComponent(segments[0]!)}`);
+  if (segments.length === 2 && campusSubroutes.has(segments[1]!)) return checkApiResource(`/campuses/${encodeURIComponent(segments[0]!)}`);
+  return 404;
+};
 const renderProductionPage = async (request: Request) => {
-  const card = await socialCardFor(request);
+  const [originalCard, status] = await Promise.all([socialCardFor(request), routeStatusFor(request)]);
+  const card = status === 404
+    ? { ...originalCard, title: "Página não encontrada | Campus Ambassador Hub", description: "A página solicitada não existe ou foi movida.", noIndex: true }
+    : originalCard;
   const html = await (productionHtml ??= file(join(distDir, "index.html")).text());
   return new Response(injectSocialCard(html, card, new URL(request.url).toString()), {
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" },
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": status === 404 ? "no-store" : "public, max-age=60, s-maxage=300, stale-while-revalidate=600" },
   });
 };
 const allowedProductionHosts = new Set([

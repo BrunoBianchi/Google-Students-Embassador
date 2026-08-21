@@ -26,6 +26,7 @@ import EventsPortal from "./tenants/google/components/events/EventsPortal";
 import ConnectPortal from "./tenants/google/components/connect/ConnectPortal";
 import AmbassadorProfileView from "./tenants/google/components/connect/AmbassadorProfileView";
 import BrazilNetworkMap from "./tenants/google/components/BrazilNetworkMap";
+import NotFoundPage from "./tenants/google/components/NotFoundPage";
 import { resolveAppContext, type AppContext } from "./utils/subdomain";
 import { updateSeo } from "./seo";
 
@@ -86,6 +87,8 @@ function renderCampusSpace(slug: string, subRoute: string) {
   } else if (subRoute === "about") {
     activeTab = "about";
     child = <CampusAbout />;
+  } else if (subRoute) {
+    return <NotFoundPage />;
   }
 
   return (
@@ -279,7 +282,7 @@ function AppContent() {
     return renderCampusSpace(firstSegment, secondSegment);
   }
 
-  return <GoogleTenant />;
+  return path === "/" ? <GoogleTenant /> : <NotFoundPage />;
 }
 
 export default App;

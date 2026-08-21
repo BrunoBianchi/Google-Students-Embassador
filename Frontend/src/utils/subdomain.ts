@@ -21,7 +21,13 @@ export function resolveAppContext(
   const host = hostname.toLowerCase();
 
   // 2. Subdomain check (production and local subdomains like campus.localhost)
-  if (host.startsWith("campus.") || host === "campus.studentembassador.com" || host === "campus.studentambassador.com") {
+  // campus.studentembassador.com is the canonical host for the whole app,
+  // rather than a context-only subdomain. Campus spaces still use /:slug.
+  if (host === "campus.studentembassador.com" || host === "campus.studentambassador.com") {
+    return "MAIN";
+  }
+
+  if (host.startsWith("campus.")) {
     return "CAMPUS";
   }
 
@@ -45,19 +51,17 @@ export function getCrossSubdomainUrl(targetContext: AppContext, targetPath: stri
   const normalizedPath = targetPath.startsWith("/") ? targetPath : `/${targetPath}`;
 
   if (isProd) {
-    const baseDomain = window.location.hostname.includes("studentambassador.com")
-      ? "studentambassador.com"
-      : "studentembassador.com";
+    const canonicalOrigin = "https://campus.studentembassador.com";
 
     switch (targetContext) {
       case "MAIN":
-        return `https://${baseDomain}${normalizedPath}`;
+        return `${canonicalOrigin}${normalizedPath}`;
       case "CAMPUS":
-        return `https://campus.${baseDomain}${normalizedPath}`;
+        return `${canonicalOrigin}${normalizedPath === "/" ? "/campuses" : normalizedPath}`;
       case "EVENTS":
-        return `https://events.${baseDomain}${normalizedPath}`;
+        return `${canonicalOrigin}${normalizedPath === "/" ? "/events" : normalizedPath}`;
       case "CONNECT":
-        return `https://connect.${baseDomain}${normalizedPath}`;
+        return `${canonicalOrigin}${normalizedPath === "/" ? "/ambassadors" : normalizedPath}`;
     }
   }
 
