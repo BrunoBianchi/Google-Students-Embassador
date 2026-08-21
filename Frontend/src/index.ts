@@ -185,11 +185,13 @@ const allowedProductionHosts = new Set([
   "campus.studentembassador.com",
   "events.studentembassador.com",
   "connect.studentembassador.com",
+  "google.studentembassador.com",
   "studentambassador.com",
   "www.studentambassador.com",
   "campus.studentambassador.com",
   "events.studentambassador.com",
   "connect.studentambassador.com",
+  "google.studentambassador.com",
 ]);
 
 const redirectToCanonicalHost = (request: Request) => {
