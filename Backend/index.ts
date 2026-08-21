@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { ensureUniversityIndex } from "./src/services/university.services";
 import { ensureUserIndexes } from "./src/services/user.services";
 import { ensureSessionIndexes } from "./src/services/session.services";
-import { ensureCampusIndexes, seedDefaultCampuses } from "./src/services/campus.services";
+import { backfillEventVisibility, ensureCampusIndexes } from "./src/services/campus.services";
 import { allowCors, apiRateLimit, requireTrustedOrigin } from "./src/controllers/middleware/security.middleware";
 
 
@@ -208,7 +208,7 @@ AppDataSource.initialize()
     await ensureUserIndexes();
     await ensureSessionIndexes();
     await ensureCampusIndexes();
-    await seedDefaultCampuses();
+    await backfillEventVisibility();
     await ensureAnnouncementIndexes();
     await seedDefaultAnnouncements();
     app.listen(port, host, () => {

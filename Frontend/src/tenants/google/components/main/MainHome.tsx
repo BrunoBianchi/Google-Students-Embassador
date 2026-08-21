@@ -22,7 +22,7 @@ export default function MainHome() {
   const pillars = [
     {
       title: "Campuses Universitários",
-      subtitle: "campus.studentembassador.com",
+      subtitle: "campus.studentembassador.com/campuses",
       description:
         "Espaços dedicados a cada universidade participante com agendas locais, oficinas práticas e liderança estudantil.",
       href: getCrossSubdomainUrl("CAMPUS", "/"),
@@ -33,7 +33,7 @@ export default function MainHome() {
     },
     {
       title: "Eventos Globais",
-      subtitle: "events.studentembassador.com",
+      subtitle: "campus.studentembassador.com/events",
       description:
         "Agenda unificada de palestras, workshops de tecnologia, hackathons e summits abertos a universitários de todo o país.",
       href: getCrossSubdomainUrl("EVENTS", "/"),
@@ -44,7 +44,7 @@ export default function MainHome() {
     },
     {
       title: "Connect & Comunidade",
-      subtitle: "connect.studentembassador.com",
+      subtitle: "campus.studentembassador.com/ambassadors",
       description:
         "Diretório de Ambassadors por região e universidade, comunicados oficiais, grupos de estudo e conexões profissionais.",
       href: getCrossSubdomainUrl("CONNECT", "/"),

@@ -210,6 +210,21 @@ function AppContent() {
     return <PublicProfile userId={path.split("/")[2]!} />;
   }
 
+  // Public directory URLs are canonical and must win over legacy subdomain
+  // context. This prevents /ambassadors from ever rendering the campus list.
+  if (path === "/campuses") return <CampusDirectory />;
+  if (path === "/events") return <EventsPortal initialTab="upcoming" />;
+  if (path === "/ambassadors") return <ConnectPortal initialTab="ambassadors" />;
+  if (path.startsWith("/ambassadors/") && path.split("/")[2]) {
+    return <AmbassadorProfileView identifier={path.split("/")[2]!} />;
+  }
+  if (path === "/regions") return <ConnectPortal initialTab="regions" />;
+  if (path.startsWith("/regions/") && path.split("/")[2]) {
+    return <ConnectPortal initialTab="regions" selectedRegionSlug={path.split("/")[2]!} />;
+  }
+  if (path === "/announcements") return <ConnectPortal initialTab="announcements" />;
+  if (path === "/community") return <ConnectPortal initialTab="community" />;
+
   // 3. CAMPUS CONTEXT (campus.studentembassador.com or ?context=campus)
   if (context === "CAMPUS") {
     // Dynamic Multi-Campus Routing (/:campusSlug/*)
@@ -265,18 +280,6 @@ function AppContent() {
   if (path === "/programs") return <ProgramsPage />;
   if (path === "/opportunities") return <OpportunitiesPage />;
   if (path === "/partners") return <PartnersPage />;
-  if (path === "/campuses") return <CampusDirectory />;
-  if (path === "/events") return <EventsPortal initialTab="upcoming" />;
-  if (path === "/ambassadors") return <ConnectPortal initialTab="ambassadors" />;
-  if (path.startsWith("/ambassadors/") && path.split("/")[2]) {
-    return <AmbassadorProfileView identifier={path.split("/")[2]!} />;
-  }
-  if (path === "/regions") return <ConnectPortal initialTab="regions" />;
-  if (path.startsWith("/regions/") && path.split("/")[2]) {
-    return <ConnectPortal initialTab="regions" selectedRegionSlug={path.split("/")[2]!} />;
-  }
-  if (path === "/announcements") return <ConnectPortal initialTab="announcements" />;
-
   // Dynamic campus resolution if accessed directly on main
   if (!reservedCampusPaths.has(firstSegment) && firstSegment !== "") {
     return renderCampusSpace(firstSegment, secondSegment);

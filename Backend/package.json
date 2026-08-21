@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "bun --watch index.ts",
-    "start": "bun index.ts"
+    "start": "bun index.ts",
+    "cleanup:demo-campuses": "bun scripts/remove-demo-campuses.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -30,11 +30,13 @@ export type Campus = {
   emailDomains: string[];
   city?: string;
   state?: string;
+  region?: string;
   country?: string;
   logoUrl?: string;
   coverImageUrl?: string;
   totalMembers?: number;
   ambassadorCount?: number;
+  eventsCount?: number;
   stats?: { totalMembers: number; ambassadorCount: number };
 };
 

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, MapPin, Calendar, Building2, Users, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
+import { authApi, type Campus } from '../../../services/auth';
 
 const mockAmbassadors = [
   { name: 'Beatriz Lima', role: 'Embaixadora Estudantil', campus: 'USP - Butantã', course: 'Engenharia de Software', city: 'São Paulo, SP', avatarBg: '#4F46E5', badge: 'Líder de IA', tags: ['Gemini', 'Python', 'Workshops'] },
@@ -14,14 +15,18 @@ const mockEvents = [
   { title: 'Campus Tech Summit: O Futuro do Desenvolvedor', date: '15 de Abril · 09h', campus: 'UFMG - Centro de Atividades', host: 'Mariana Costa & Equipe', attendees: 120, tag: 'CONFERÊNCIA', tagBg: '#06B6D4' }
 ];
 
-const mockCampuses = [
-  { slug: 'usp', name: 'USP · Universidade de São Paulo', state: 'SP', members: 48, domain: '@usp.br', badge: 'Líder de Pesquisa', tagBg: '#EEF2FF', tagText: '#4F46E5' },
-  { slug: 'unicamp', name: 'UNICAMP · Universidade Estadual de Campinas', state: 'SP', members: 32, domain: '@unicamp.br', badge: 'Hub de Inovação', tagBg: '#ECFEFF', tagText: '#0891B2' },
-  { slug: 'ufmg', name: 'UFMG · Universidade Federal de Minas Gerais', state: 'MG', members: 29, domain: '@ufmg.br', badge: 'Comunidade Ativa', tagBg: '#ECFDF5', tagText: '#059669' }
-];
-
 const InteractiveShowcase: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'ambassadors' | 'events' | 'campuses'>('ambassadors');
+  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [campusesLoading, setCampusesLoading] = useState(true);
+
+  useEffect(() => {
+    authApi
+      .listCampuses()
+      .then(({ campuses: items }) => setCampuses(items.slice(0, 3)))
+      .catch(() => setCampuses([]))
+      .finally(() => setCampusesLoading(false));
+  }, []);
 
   return (
     <section id="demonstracao" className="py-24 bg-white border-y-3 border-[#1e293b] relative">
@@ -217,27 +222,37 @@ const InteractiveShowcase: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {mockCampuses.map((c, idx) => (
-                  <div key={idx} className="bg-white p-5 rounded-2xl border-2 border-[#1e293b] flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-[#34A853] transition-colors shadow-sm">
+                {campusesLoading ? (
+                  <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-8 text-center text-sm font-bold text-slate-500">
+                    Carregando universidades cadastradas...
+                  </div>
+                ) : campuses.length === 0 ? (
+                  <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-8 text-center">
+                    <p className="font-black text-[#1e293b]">Nenhuma universidade cadastrada ainda.</p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Os campi aparecerão aqui quando forem criados por usuários reais.</p>
+                  </div>
+                ) : campuses.map((c) => (
+                  <div key={c.id} className="bg-white p-5 rounded-2xl border-2 border-[#1e293b] flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-[#34A853] transition-colors shadow-sm">
                     <div>
                       <div className="flex items-center gap-2 mb-1.5">
                         <span 
-                          className="font-black text-[10px] px-2 py-0.5 rounded border border-[#1e293b] inline-block font-mono uppercase"
-                          style={{ backgroundColor: c.tagBg, color: c.tagText }}
+                          className="font-black text-[10px] px-2 py-0.5 rounded border border-[#1e293b] inline-block font-mono uppercase bg-emerald-50 text-emerald-700"
                         >
                           {c.slug}
                         </span>
-                        <span className="text-2xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                          {c.domain}
-                        </span>
+                        {c.emailDomains[0] && (
+                          <span className="text-2xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                            @{c.emailDomains[0]}
+                          </span>
+                        )}
                       </div>
                       <h4 className="font-extrabold text-sm sm:text-base text-[#1e293b]">{c.name}</h4>
-                      <span className="text-xs text-gray-500 font-medium">Estado: {c.state}</span>
+                      <span className="text-xs text-gray-500 font-medium">{[c.city, c.state].filter(Boolean).join(', ') || 'Localização não informada'}</span>
                     </div>
 
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <span className="text-xs font-bold text-[#1e293b] bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-300">
-                        🏛️ {c.members} membros
+                        🏛️ {c.totalMembers ?? 0} membros
                       </span>
                       <a 
                         href={`/${c.slug}`}

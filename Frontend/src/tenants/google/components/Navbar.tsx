@@ -17,18 +17,17 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import { getAvatarUrl } from '../../../services/auth';
 import Logo from './Logo';
-import { getCrossSubdomainUrl, resolveAppContext } from '../../../utils/subdomain';
+import { getCrossSubdomainUrl } from '../../../utils/subdomain';
 
 export const Navbar: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { user, isLoading, logout } = useAuth();
-  const appContext = typeof window !== 'undefined' ? resolveAppContext() : 'MAIN';
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
 
-  const isCampusesActive = appContext === 'CAMPUS' || currentPath === '/campuses' || currentPath.startsWith('/campuses/');
-  const isAmbassadorsActive = (appContext === 'CONNECT' && (currentPath === '/ambassadors' || currentPath.startsWith('/ambassadors/') || currentPath === '/')) || currentPath.startsWith('/ambassadors') || currentPath.startsWith('/u/') || currentPath.startsWith('/regions');
-  const isEventsActive = appContext === 'EVENTS' || currentPath === '/events' || currentPath.startsWith('/events/');
+  const isCampusesActive = currentPath === '/campuses' || currentPath.startsWith('/campuses/');
+  const isAmbassadorsActive = currentPath.startsWith('/ambassadors') || currentPath.startsWith('/u/') || currentPath.startsWith('/regions');
+  const isEventsActive = currentPath === '/events' || currentPath.startsWith('/events/');
   const isMapActive = currentPath === '/map';
   const isAboutActive = currentPath === '/about' || currentPath === '/#sobre';
   const isTermsActive = currentPath === '/terms';
@@ -83,7 +82,7 @@ export const Navbar: React.FC = () => {
             }`}
           >
             <UsersRound size={13} className="text-emerald-600" />
-            <span>Embaixadores 2026</span>
+            <span>Embaixadores</span>
           </a>
 
           <a

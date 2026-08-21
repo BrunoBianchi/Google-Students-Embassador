@@ -138,7 +138,7 @@ export default function CampusDirectory() {
             Universidades Cadastradas ({campuses.length})
           </h2>
           <span className="text-2xs text-[#475569] font-mono font-bold">
-            campus.studentembassador.com/:slug
+            campus.studentembassador.com/campuses
           </span>
         </div>
 

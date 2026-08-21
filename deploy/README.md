@@ -10,9 +10,11 @@ Crie estes registros `A` no DNS da DigitalOcean, todos apontando para `206.81.1.
 | --- | --- |
 | `@` | `206.81.1.32` |
 | `campus` | `206.81.1.32` |
-| `*` | `206.81.1.32` |
+| `connect` | `206.81.1.32` |
+| `events` | `206.81.1.32` |
+| `google` | `206.81.1.32` |
 
-O curinga é necessário para que `qualquer.studentembassador.com` (incluindo o legado `google.studentembassador.com`) chegue ao Nginx e seja redirecionado para `campus.studentembassador.com`.
+Os hosts legados `connect`, `events` e `google` chegam ao Nginx por HTTPS e são tratados sem erro de certificado. Os links da interface usam as rotas canônicas em `campus.studentembassador.com`.
 
 ## Preparar o servidor
 
@@ -56,15 +58,16 @@ chown -R gsa:gsa /opt/google-student-ambassador
 
 ## Certificado HTTPS
 
-Para cobrir a raiz e todos os subdomínios, emita um certificado com desafio DNS da DigitalOcean:
+Para cobrir a raiz e todos os hosts publicados, emita um certificado SAN pelo webroot do Nginx:
 
 ```bash
-install -d -m 700 /root/.secrets/certbot
-printf 'dns_digitalocean_token = COLE_SEU_TOKEN_AQUI\n' > /root/.secrets/certbot/digitalocean.ini
-chmod 600 /root/.secrets/certbot/digitalocean.ini
-certbot certonly --dns-digitalocean \
-  --dns-digitalocean-credentials /root/.secrets/certbot/digitalocean.ini \
-  -d studentembassador.com -d '*.studentembassador.com'
+certbot certonly --webroot -w /var/www/certbot \
+  --cert-name studentembassador.com --expand \
+  -d studentembassador.com \
+  -d campus.studentembassador.com \
+  -d connect.studentembassador.com \
+  -d events.studentembassador.com \
+  -d google.studentembassador.com
 ```
 
 ## Nginx e serviços
@@ -104,11 +107,10 @@ ufw status verbose
 ```bash
 ss -ltnp | grep -E ':(80|443|3000|3001)'
 curl -I https://campus.studentembassador.com
-curl -I https://studentembassador.com/eventos
-curl -I https://teste.studentembassador.com/eventos
+curl -I https://connect.studentembassador.com/ambassadors
+curl -I https://events.studentembassador.com/events
 ```
 
 O resultado esperado é Nginx em `206.81.1.32:80` e `206.81.1.32:443`, enquanto os processos Bun aparecem somente em `127.0.0.1:3000` e `127.0.0.1:3001`.
 
 > Nenhuma configuração consegue impedir um processo malicioso que já tenha acesso administrativo ao próprio Droplet de chamar `127.0.0.1`. A proteção aplicada aqui bloqueia o acesso remoto direto: apenas o Nginx público conversa com os serviços internos, e os serviços rodam como usuário sem login (`gsa`).
-
